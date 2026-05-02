@@ -506,6 +506,27 @@ app.MapGet("/api/analytics/scroll", (IConfiguration config) =>
 app.MapGet("/api/analytics/exceptions", (IConfiguration config) =>
     Results.Ok(Array.Empty<object>()));
 
+// --- Azure Event Grid Webhook Endpoint (Email Confirmations) ---
+app.MapPost("/api/webhooks/eventgrid", async (HttpContext context, IConfiguration config) => {
+    using var reader = new StreamReader(context.Request.Body);
+    var body = await reader.ReadToEndAsync();
+    Console.WriteLine("Received EventGrid Event: " + body);
+    
+    // Azure Event Grid Validation Handshake
+    if (context.Request.Headers["aeg-event-type"].FirstOrDefault() == "SubscriptionValidation") {
+        var json = System.Text.Json.JsonDocument.Parse(body);
+        if (json.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array && json.RootElement.GetArrayLength() > 0) {
+            var firstEvent = json.RootElement[0];
+            if (firstEvent.TryGetProperty("data", out var data) && data.TryGetProperty("validationCode", out var validationCode)) {
+                return Results.Ok(new { validationResponse = validationCode.GetString() });
+            }
+        }
+    }
+
+    // Process actual delivery reports here (Update database to 'Delivered' / 'Bounced')
+    return Results.Ok();
+});
+
 app.Run();
 
 public record SendSingleRequest(string Email, string? Name, string? Subject, string? SenderType, string? Body, string? BatchId);
