@@ -1,0 +1,165 @@
+/* BLAST STUDIO - LIQUID RIGHT NAV SYSTEM */
+
+:root {
+  --nav-bg: rgba(255, 255, 255, 0.03);
+  --nav-blur: 20px;
+  --nav-border: rgba(255, 255, 255, 0.1);
+  --nav-text: #FFFFFF;
+  --nav-active-bg: rgba(255, 255, 255, 0.1);
+  --nav-collapsed: 70px;
+  --nav-expanded: 220px;
+}
+
+.sidebar {
+  position: fixed;
+  right: 20px;
+  top: 20px;
+  bottom: 20px;
+  width: var(--nav-collapsed);
+  background: var(--nav-bg);
+  backdrop-filter: blur(var(--nav-blur));
+  -webkit-backdrop-filter: blur(var(--nav-blur));
+  border: 1px solid var(--nav-border);
+  border-radius: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 10px;
+  z-index: 10000;
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.sidebar:hover {
+  width: var(--nav-expanded);
+}
+
+.sidebar-header {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0 5px;
+  margin-bottom: 30px;
+  box-sizing: border-box;
+}
+
+.sidebar-logo {
+  height: 28px;
+  width: 28px;
+  background-color: #FF2D2D;
+  -webkit-mask: url('logo.svg') no-repeat center / contain;
+  mask: url('logo.svg') no-repeat center / contain;
+  flex-shrink: 0;
+}
+
+.sidebar-brand {
+  color: #fff;
+  font-weight: 900;
+  letter-spacing: 2px;
+  font-size: 14px;
+  opacity: 0;
+  width: 0;
+  white-space: nowrap;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: right;
+  overflow: hidden;
+}
+
+.sidebar:hover .sidebar-brand {
+  opacity: 1;
+  width: auto;
+  margin-right: 12px;
+}
+
+.sidebar-footer {
+  margin-top: auto; /* Pushes footer to bottom */
+  padding: 20px 0 0 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+}
+
+.sidebar:hover .sidebar-footer {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebar-footer img {
+  height: 22px;
+  filter: brightness(0) invert(1); /* Forces the entire logo to render as pure solid white */
+  transition: height 0.3s;
+}
+
+.nav-links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.nav-links a {
+  position: relative;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 15px;
+  border-radius: 100px;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: row-reverse; /* Icon on the right edge */
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.nav-links a svg {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  stroke-width: 2;
+  transition: all 0.3s;
+}
+
+.nav-links a span {
+  opacity: 0;
+  width: 0;
+  white-space: nowrap;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: right;
+}
+
+.sidebar:hover .nav-links a {
+  background: rgba(255, 255, 255, 0.03);
+  color: #FFFFFF;
+}
+
+.sidebar:hover .nav-links a span {
+  opacity: 1;
+  width: auto;
+  flex-grow: 1; /* Pushes the icon to the right side of the pill */
+  margin-right: 15px; /* Gap between text and icon */
+}
+
+.nav-links a.active {
+  background: var(--nav-active-bg);
+  color: #FFFFFF !important;
+}
+
+/* Adjust Main Content for Right Sidebar */
+.main-content {
+  margin-left: 0 !important;
+  margin-right: 100px !important;
+  margin-top: 0 !important;
+  padding: 60px;
+  width: calc(100% - 100px) !important;
+}

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EchoMail | History</title>
+    <link rel="stylesheet" href="sidebar.css">
+    <script src="sidebar.js"></script>
+    <script>
+        if (localStorage.getItem('blast_studio_auth') !== 'true') {
+            window.location.href = 'login.html';
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary:    #FF2D2D;
+            --secondary:  #FF2D2D;
+            --bg:         #111111;
+            --surface:    #161616;
+            --border:     #333333;
+            --text:       #FFFFFF;
+            --text-sub:   #999999;
+            --text-faint: #444444;
+            --accent:     #FF2D2D;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body {
+            background-color: var(--bg);
+            min-height: 100vh;
+            color: var(--text);
+            position: relative;
+            display: flex;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.04;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Local Styles */
+
+        @media (max-width: 900px) { 
+            .container { grid-template-columns: 1fr; } 
+        }
+
+        .container {
+            max-width: 1500px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 28px;
+        }
+
+        .widget {
+            background: #111111;
+            border: 1px dashed #333333;
+            border-radius: 4px;
+            padding: 28px;
+            height: fit-content;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .widget::before, .widget::after {
+            content: '○';
+            position: absolute;
+            font-size: 10px;
+            color: #444;
+        }
+        .widget::before { top: 10px; left: 10px; }
+        .widget::after { top: 10px; right: 10px; }
+
+        .widget-title {
+            font-size: 14px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-sub);
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Stacked card list — spaced for clarity */
+        .blast-card-grid { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 12px; 
+            overflow-y: auto; 
+            max-height: 76vh; 
+            padding: 8px 4px; 
+        }
+
+        .blast-card {
+            background: #0a0a0a;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .blast-card:hover {
+            border-color: #333;
+            background: #111111;
+        }
+            z-index: 1;
+            position: relative;
+            background: rgba(19,19,19,0.02);
+        }
+        /* Selected = Bold Black card */
+        .blast-card.selected { background: var(--primary); border-color: var(--primary); }
+        .blast-card.selected .blast-card-sub  { color: rgba(255,255,255,0.6); }
+        .blast-card.selected .blast-card-title { color: #ffffff; }
+        .blast-card.selected .timeline-labels { color: rgba(255,255,255,0.6); }
+        .blast-card.selected .timeline-track  { background: rgba(255,255,255,0.15); }
+        .blast-card.selected .timeline-fill   { background: #ffffff; }
+        .blast-card.selected .timeline-dot    { background: #ffffff; }
+        .blast-card.selected .timeline-dot.end { background: rgba(255,255,255,0.3); }
+        .blast-card.selected .card-icon-btn   { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.7); }
+        .blast-card.selected .pill-badge      { background: #ffffff; color: #0a0a0a; }
+
+        /* Top row */
+        .blast-card-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+
+        /* PILL BADGE — monochrome/maroon mix */
+        .pill-badge { background:transparent; color:#FF2D2D; border:1.5px solid #FF2D2D; font-size:11px; font-weight:800; padding:5px 14px; border-radius:100px; letter-spacing:0.5px; text-transform:uppercase; }
+        .pill-badge.success { color:#FF2D2D; border-color:#FF2D2D; }
+        .pill-badge.pending { color:#999; border-color:#333; }
+        .pill-badge.failed  { color:#FFFFFF; border-color:#FFFFFF; }
+
+        .card-icon-btn { width:32px; height:32px; border-radius:50%; background:#f3f3f0; border:1.5px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:14px; color:#6b6b6b; transition:background 0.15s; }
+        .card-icon-btn:hover { background:#e8e8e4; }
+
+        .blast-card-sub   { font-size:12px; color:var(--text-sub); margin-bottom:4px; font-weight:500; }
+        .blast-card-title { font-size:16px; font-weight:800; color:var(--text); line-height:1.35; margin-bottom:18px; }
+
+        /* Timeline */
+        .card-timeline  { position:relative; margin-top:4px; }
+        .timeline-track { height:1.5px; background:#e0e0dc; border-radius:2px; position:relative; }
+        .timeline-fill  { position:absolute; left:0; top:0; height:100%; background:#0a0a0a; border-radius:2px; transition:width 0.4s ease; }
+        .timeline-dot   { width:8px; height:8px; background:#0a0a0a; border-radius:50%; position:absolute; top:50%; transform:translateY(-50%); }
+        .timeline-dot.start { left:0; }
+        .timeline-dot.end   { right:0; background:#c8c8c4; }
+        .timeline-labels { display:flex; justify-content:space-between; margin-top:7px; font-size:11px; color:var(--text-sub); font-weight:600; }
+
+        /* Detail table */
+        .data-table { width:100%; border-collapse:collapse; font-size:13px; color: #FFFFFF; }
+        .data-table th, .data-table td { padding:12px; text-align:left; border-bottom:1px solid #222; }
+        .data-table th { font-weight:700; color:#FFFFFF; background:#1a1a1a; font-size:11px; text-transform:uppercase; letter-spacing:1px; }
+        .data-table td { color: #bbbbbb; }
+
+        .status-badge { padding:3px 10px; border-radius:100px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; }
+        .status-success { background:#e8e8e4; color:#1a1a1a; }
+        .status-pending { background:#eeeeea; color:#555555; }
+        .status-failed  { background:#0a0a0a; color:#ffffff; }
+
+        .sync-status-indicator { font-size:12px; color:var(--text-sub); font-weight:600; display:none; align-items:center; gap:6px; }
+        @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+        .syncing { animation: pulse 1.5s infinite; }
+        .empty-state { text-align:center; padding:60px 20px; color:#a0a0a0; font-size:14px; }
+        /* REVEAL ANIMATION */
+        @keyframes reveal {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .sidebar { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .header { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards; opacity: 0; }
+        .container { animation: reveal 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards; opacity: 0; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar-placeholder"></div>
+
+    <main class="main-content">
+        <div class="header">
+            <h1>H<span style="color:#e7e7e3">I</span>STORY</h1>
+            <p>Complete archive of all past newsletter transmissions and delivery reports.</p>
+        </div>
+        <style>
+            .header { margin-bottom: 48px; }
+            .header h1 { font-size: 72px; font-weight: 900; color: #FF2D2D; letter-spacing: -4px; line-height: 0.9; text-transform: uppercase; margin: 0; }
+            .header p { font-size: 14px; color: #666; margin-top: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        </style>
+
+    <div class="container">
+        <!-- Left: List of Blasts -->
+        <div class="widget">
+            <div class="widget-title">
+                Campaign Sessions
+                <div id="syncIndicator" class="sync-status-indicator syncing">
+                    <span style="font-size: 14px;">🔄</span> Syncing...
+                </div>
+            </div>
+            <div class="blast-card-grid" id="history-cards"></div>
+        </div>
+
+        <!-- Right: Recipient Details -->
+        <div class="widget">
+            <div class="widget-title" id="detailsTitle">Select a blast to view emails</div>
+            <div style="overflow-y: auto; max-height: 70vh;" id="detailsContainer">
+                <div class="empty-state">No blast selected</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedBatchId = null;
+
+        async function loadHistory(autoSync = false) {
+            try {
+                const res = await fetch('/api/analytics/blasts');
+                const data = await res.json();
+
+                const grid = document.getElementById('history-cards');
+                if (data.length === 0) {
+                    grid.innerHTML = '<div class="empty-state">📭 No campaigns found yet.</div>';
+                    return;
+                }
+
+                grid.innerHTML = data.map(b => {
+                    const date       = new Date(b.time);
+                    const dateLabel  = date.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+                    const timeLabel  = date.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+                    const isComplete = b.failed === 0 && b.sent === b.total;
+                    const hasFail    = b.failed > 0;
+                    const pillClass  = isComplete ? 'success' : hasFail ? 'failed' : 'pending';
+                    const pillText   = isComplete ? '✓ Completed' : hasFail ? '⚠ Partial' : '⟳ Syncing';
+                    const pct        = b.total > 0 ? Math.round((b.sent / b.total) * 100) : 0;
+                    const icon       = isComplete ? '✉️' : hasFail ? '⚠️' : '🔄';
+
+                    return `
+                    <div class="blast-card ${selectedBatchId === b.batchId ? 'selected' : ''}"
+                         onclick="selectBlast('${b.batchId}', '${(b.subject||'').replace(/'/g,"\\'")}')">
+                        <div class="blast-card-top">
+                            <span class="pill-badge ${pillClass}">${pillText}</span>
+                            <div class="card-icon-btn" title="${b.batchId}">${icon}</div>
+                        </div>
+                        <div class="blast-card-sub">${timeLabel}</div>
+                        <div class="blast-card-title">${b.subject || 'Newsletter Blast'}</div>
+                        <div class="card-timeline">
+                            <div class="timeline-track">
+                                <div class="timeline-fill" style="width:${pct}%"></div>
+                                <div class="timeline-dot start"></div>
+                                <div class="timeline-dot end"></div>
+                            </div>
+                            <div class="timeline-labels">
+                                <span>${dateLabel}</span>
+                                <span>${b.sent}/${b.total} sent</span>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                // Auto-select most recent blast on first load (not during re-renders)
+                if (!selectedBatchId && data.length > 0) {
+                    selectedBatchId = data[0].batchId;
+                    // Re-render with selection, then load its details
+                    grid.innerHTML = data.map(b => {
+                        const date       = new Date(b.time);
+                        const dateLabel  = date.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+                        const timeLabel  = date.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+                        const isComplete = b.failed === 0 && b.sent === b.total;
+                        const hasFail    = b.failed > 0;
+                        const pillClass  = isComplete ? 'success' : hasFail ? 'failed' : 'pending';
+                        const pillText   = isComplete ? '✓ Completed' : hasFail ? '⚠ Partial' : '⟳ Syncing';
+                        const pct        = b.total > 0 ? Math.round((b.sent / b.total) * 100) : 0;
+                        const icon       = isComplete ? '✉️' : hasFail ? '⚠️' : '🔄';
+                        return `
+                        <div class="blast-card ${selectedBatchId === b.batchId ? 'selected' : ''}"
+                             onclick="selectBlast('${b.batchId}', '${(b.subject||'').replace(/'/g,"\\'")}')"> 
+                            <div class="blast-card-top">
+                                <span class="pill-badge ${pillClass}">${pillText}</span>
+                                <div class="card-icon-btn" title="${b.batchId}">${icon}</div>
+                            </div>
+                            <div class="blast-card-sub">${timeLabel}</div>
+                            <div class="blast-card-title">${b.subject || 'Newsletter Blast'}</div>
+                            <div class="card-timeline">
+                                <div class="timeline-track">
+                                    <div class="timeline-fill" style="width:${pct}%"></div>
+                                    <div class="timeline-dot start"></div>
+                                    <div class="timeline-dot end"></div>
+                                </div>
+                                <div class="timeline-labels">
+                                    <span>${dateLabel}</span>
+                                    <span>${b.sent}/${b.total} sent</span>
+                                </div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                    selectBlast(data[0].batchId, data[0].subject);
+                }
+
+                if (autoSync) {
+                    const recentBlasts = data.slice(0, 3);
+                    document.getElementById('syncIndicator').style.display = 'flex';
+                    for (const blast of recentBlasts) {
+                        await fetch(`/api/analytics/sync-blast/${blast.batchId}`, { method: 'POST' });
+                    }
+                    document.getElementById('syncIndicator').style.display = 'none';
+                    loadHistory(false);
+                    if (selectedBatchId) selectBlast(selectedBatchId, null);
+                }
+            } catch (e) {
+                console.error('Load failed', e);
+            }
+        }
+
+        async function selectBlast(batchId, subject) {
+            selectedBatchId = batchId;
+
+            // Update card highlight without full re-render
+            document.querySelectorAll('.blast-card').forEach(card => {
+                card.classList.remove('selected');
+                if (card.getAttribute('onclick') && card.getAttribute('onclick').includes(batchId)) {
+                    card.classList.add('selected');
+                }
+            });
+
+            const container = document.getElementById('detailsContainer');
+            if (subject) document.getElementById('detailsTitle').innerText = subject;
+            container.innerHTML = '<div class="empty-state">Loading recipients...</div>';
+
+            try {
+                const res = await fetch(`/api/analytics/blast-details/${batchId}`);
+                const data = await res.json();
+                
+                container.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Recipient Email</th>
+                                <th>Result</th>
+                                <th>Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.map(d => `
+                                <tr>
+                                    <td><strong>${d.email}</strong></td>
+                                    <td>
+                                        <span class="status-badge ${d.status === 'Succeeded' || d.status === 'Sent' ? 'status-success' : 'status-failed'}">
+                                            ${d.status}
+                                        </span>
+                                        ${d.error ? `<div style="font-size:10px; color:var(--danger);">${d.error}</div>` : ''}
+                                    </td>
+                                    <td style="color:#666;">${new Date(d.time).toLocaleTimeString()}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (e) {
+                container.innerHTML = '<div class="empty-state" style="color:var(--danger);">Failed to load emails.</div>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHistory(true); // Trigger auto-sync on first load
+        });
+    </script>
+    </main>
+</body>
+</html>

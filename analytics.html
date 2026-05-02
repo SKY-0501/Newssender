@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EchoMail | Analytics</title>
+    <link rel="stylesheet" href="sidebar.css">
+    <script src="sidebar.js"></script>
+    <script>
+        if (localStorage.getItem('blast_studio_auth') !== 'true') {
+            window.location.href = 'login.html';
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary:    #FF2D2D;
+            --secondary:  #FF2D2D;
+            --bg:         #111111;
+            --surface:    #161616;
+            --border:     #333333;
+            --text:       #FFFFFF;
+            --text-sub:   #999999;
+            --text-faint: #444444;
+            --accent:     #FF2D2D;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body {
+            background-color: var(--bg);
+            min-height: 100vh;
+            color: var(--text);
+            display: flex;
+            position: relative;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.04;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Local Styles */.dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        /* CARDS — transparent paper feel */
+        .widget {
+            background: #111111;
+            border: 1px dashed #333333;
+            border-radius: 4px;
+            padding: 24px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .widget::before, .widget::after {
+            content: '○';
+            position: absolute;
+            font-size: 10px;
+            color: #444;
+        }
+        .widget::before { top: 10px; left: 10px; }
+        .widget::after { top: 10px; right: 10px; }
+
+        @media (max-width: 900px) { 
+            .dashboard-grid { grid-template-columns: repeat(2, 1fr); } 
+        }
+
+        /* Tiers mapping */
+        .tier-1 {
+            grid-column: span 1;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .tier-2 {
+            grid-column: span 2;
+        }
+
+        .tier-3 {
+            grid-column: span 4;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            background: transparent;
+            box-shadow: none;
+            padding: 0;
+            border: none;
+        }
+        .tier-3::before { display: none; }
+
+        .tier-3 > .widget {
+            grid-column: span 1;
+        }
+
+        .widget-title {
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-sub);
+            margin-bottom: 15px;
+        }
+
+        /* KPI Specific */
+        .kpi-value {
+            font-size: 48px;
+            font-weight: 900;
+            color: #FFFFFF;
+            margin: 5px 0;
+            letter-spacing: -1.5px;
+        }
+        .kpi-sub {
+            font-size: 13px;
+            font-weight: 600;
+            color: #bbbbbb;
+        }
+
+        /* Charts Container */
+        .chart-container {
+            position: relative;
+            height: 250px;
+            width: 100%;
+        }
+
+        /* Feed Specific — monochrome terminal style */
+        .exception-feed {
+            max-height: 250px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            background: #ffffff;
+            color: #0a0a0a;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1.5px solid var(--border);
+        }
+        .exception-feed li {
+            margin-bottom: 8px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(247,247,239,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            border-radius: 20px;
+        }
+        .spinner {
+            width: 24px; height: 24px;
+            border: 3px solid #e0e0dc;
+            border-top-color: #0a0a0a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Error state */
+        .error-message {
+            color: var(--danger);
+            font-size: 13px;
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* Data Tables */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .data-table th, .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        .data-table th {
+            font-weight: 800;
+            color: #000000; /* High contrast black text on light header */
+            background: #e8e8e4;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+        .data-table tr:hover td {
+            background: rgba(0,0,0,0.02);
+        }
+        .badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge.verified { background: #e8f8f5; color: #06907b; }
+        .badge.pending { background: #fef9e7; color: #f1c40f; }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
+            .tier-3 { grid-template-columns: repeat(1, 1fr); }
+        }
+        @media (max-width: 600px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .tier-1, .tier-2 { grid-column: span 1; }
+            .navbar { flex-direction: column; gap: 15px; }
+        }
+
+        /* REVEAL ANIMATION */
+        @keyframes reveal {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .sidebar { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .header { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards; opacity: 0; }
+        .dashboard-grid { animation: reveal 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards; opacity: 0; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar-placeholder"></div>
+
+    <main class="main-content">
+        <div class="header">
+            <h1>A<span style="color:#e7e7e3">N</span>ALYTICS</h1>
+            <p>Real-time telemetry and subscriber growth metrics from the production database.</p>
+        </div>
+        <style>
+            .header { margin-bottom: 48px; }
+            .header h1 { font-size: 72px; font-weight: 900; color: #FF2D2D; letter-spacing: -4px; line-height: 0.9; text-transform: uppercase; margin: 0; }
+            .header p { font-size: 14px; color: #666; margin-top: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        </style>
+
+    <!-- Tier 1: High-Level KPIs -->
+    <div class="dashboard-grid">
+        <div class="widget tier-1" id="w1-subscribers">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Verified Subscribers</div>
+            <div class="kpi-value" id="val-subscribers">-</div>
+            <div class="kpi-sub">Total Active List (SQL)</div>
+        </div>
+        <div class="widget tier-1" id="w2-crosspoll">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Cross-Pollination</div>
+            <div class="kpi-value" id="val-crosspoll">-%</div>
+            <div class="kpi-sub">Inquiry to Newsletter Opt-in (SQL)</div>
+        </div>
+        <div class="widget tier-1" id="w3-activetime">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Avg Active Time</div>
+            <div class="kpi-value" id="val-activetime">-s</div>
+            <div class="kpi-sub">Time on Page (KQL)</div>
+        </div>
+        <div class="widget tier-1" id="w4-mobile">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Mobile Traffic</div>
+            <div class="kpi-value" id="val-mobile">-%</div>
+            <div class="kpi-sub">Device Split (KQL)</div>
+        </div>
+    </div>
+
+    <!-- Tier 2: Trends -->
+    <div class="dashboard-grid">
+        <div class="widget tier-2" id="w5-growth">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Subscriber Growth</div>
+            <div class="chart-container"><canvas id="chart-growth"></canvas></div>
+        </div>
+        <div class="widget tier-2" id="w6-funnel">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Verification Funnel</div>
+            <div class="chart-container"><canvas id="chart-funnel"></canvas></div>
+        </div>
+    </div>
+    
+    <div class="dashboard-grid">
+        <div class="widget tier-2" id="w7-latency">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">API Latency Health</div>
+            <div class="chart-container"><canvas id="chart-latency"></canvas></div>
+        </div>
+        <div class="widget tier-2" id="w8-scroll">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Scroll Depth Drop-off</div>
+            <div class="chart-container"><canvas id="chart-scroll"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Tier 3: Content & Exceptions -->
+    <div class="dashboard-grid tier-3">
+        <div class="widget" id="w9-topics">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Top Inquiry Topics</div>
+            <div class="chart-container"><canvas id="chart-topics"></canvas></div>
+        </div>
+        
+        <div class="widget" id="w10-exceptions" style="grid-column: span 2;">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Live JS Exceptions Feed</div>
+            <ul class="exception-feed" id="feed-exceptions">
+                <!-- Populated via KQL -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- Tier 4: Data Tables -->
+    <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="widget" id="w11-subscribers" style="grid-column: span 1;">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Recent Subscribers</div>
+            <div style="overflow-x: auto; max-height: 250px;">
+                <table class="data-table">
+                    <thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead>
+                    <tbody id="table-subscribers"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="widget" id="w12-inquiries" style="grid-column: span 1;">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Recent Inquiries</div>
+            <div style="overflow-x: auto; max-height: 250px;">
+                <table class="data-table">
+                    <thead><tr><th>Name</th><th>Topic</th><th>Message</th></tr></thead>
+                    <tbody id="table-inquiries"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Chart Config Defaults
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#FFFFFF';
+        Chart.defaults.plugins.legend.labels.color = '#FFFFFF';
+        Chart.defaults.plugins.tooltip.backgroundColor = '#1a1a1a';
+        
+        // Scale Defaults
+        Chart.defaults.scales.category.grid = { color: 'rgba(255, 255, 255, 0.1)' };
+        Chart.defaults.scales.linear.grid = { color: 'rgba(255, 255, 255, 0.1)' };
+        Chart.defaults.scales.category.ticks = { color: '#bbbbbb' };
+        Chart.defaults.scales.linear.ticks = { color: '#bbbbbb' };
+        
+        const colors = {
+            primary: '#FFFFFF',
+            secondary: '#FF2D2D',
+            accent1: '#FFFFFF',
+            accent2: '#bbbbbb',
+            accent3: '#333333',
+            bgPrimary: 'rgba(255, 45, 45, 0.1)',
+            bgSecondary: 'rgba(255, 255, 255, 0.05)'
+        };
+
+        // Utility: Fetch and remove spinner
+        async function fetchWidgetData(endpoint, widgetId) {
+            try {
+                const res = await fetch(endpoint);
+                if (!res.ok) throw new Error('API Error');
+                const data = await res.json();
+                document.querySelector(`#${widgetId} .loading-overlay`).style.display = 'none';
+                return data;
+            } catch (err) {
+                const widget = document.getElementById(widgetId);
+                widget.querySelector('.loading-overlay').style.display = 'none';
+                const errDiv = document.createElement('div');
+                errDiv.className = 'error-message';
+                errDiv.innerText = 'Failed to load data. Check configuration.';
+                widget.appendChild(errDiv);
+                return null;
+            }
+        }
+
+        async function initDashboard() {
+            // TIER 1: KPIs
+            const kpis = await fetchWidgetData('/api/analytics/kpis', 'w1-subscribers');
+            if (kpis) {
+                document.getElementById('val-subscribers').innerText = kpis.totalVerified.toLocaleString();
+                document.getElementById('val-crosspoll').innerText = kpis.crossPollinationRate.toFixed(1) + '%';
+                
+                // Hide other spinners manually since they shared the API call
+                document.querySelector('#w2-crosspoll .loading-overlay').style.display = 'none';
+            }
+            
+            const kqlKpis = await fetchWidgetData('/api/analytics/kql-kpis', 'w3-activetime');
+            if (kqlKpis) {
+                document.getElementById('val-activetime').innerText = kqlKpis.avgActiveTime + 's';
+                document.getElementById('val-mobile').innerText = kqlKpis.mobilePercentage.toFixed(1) + '%';
+                document.querySelector('#w4-mobile .loading-overlay').style.display = 'none';
+            }
+
+            // TIER 2 & 3: CHARTS
+            
+            // 1. Growth Line Chart
+            const growthData = await fetchWidgetData('/api/analytics/growth', 'w5-growth');
+            if (growthData) {
+                new Chart(document.getElementById('chart-growth'), {
+                    type: 'line',
+                    data: {
+                        labels: growthData.labels,
+                        datasets: [{
+                            label: 'New Subscribers',
+                            data: growthData.values,
+                            borderColor: colors.primary,
+                            backgroundColor: colors.bgPrimary,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                });
+            }
+
+            // 2. Funnel (Bar Chart styled as funnel)
+            const funnelData = await fetchWidgetData('/api/analytics/funnel', 'w6-funnel');
+            if (funnelData) {
+                new Chart(document.getElementById('chart-funnel'), {
+                    type: 'bar',
+                    data: {
+                        labels: ['Total Signups', 'Pending', 'Verified'],
+                        datasets: [{
+                            data: [funnelData.total, funnelData.pending, funnelData.verified],
+                            backgroundColor: [colors.accent1, colors.accent2, colors.secondary],
+                            borderRadius: 6
+                        }]
+                    },
+                    options: { 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { display: false } },
+                        indexAxis: 'y'
+                    }
+                });
+            }
+
+            // 3. Topics Donut
+            const topicsData = await fetchWidgetData('/api/analytics/topics', 'w9-topics');
+            if (topicsData) {
+                new Chart(document.getElementById('chart-topics'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: topicsData.labels,
+                        datasets: [{
+                            data: topicsData.values,
+                            backgroundColor: [colors.primary, colors.secondary, colors.accent1, colors.accent2, colors.accent3],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: { maintainAspectRatio: false, cutout: '70%' }
+                });
+            }
+
+            // 4. API Latency Line Chart (KQL)
+            const latencyData = await fetchWidgetData('/api/analytics/latency', 'w7-latency');
+            if (latencyData) {
+                new Chart(document.getElementById('chart-latency'), {
+                    type: 'line',
+                    data: {
+                        labels: latencyData.labels,
+                        datasets: [{
+                            label: 'Avg Latency (ms)',
+                            data: latencyData.values,
+                            borderColor: colors.secondary,
+                            tension: 0.1,
+                            pointRadius: 2
+                        }]
+                    },
+                    options: { maintainAspectRatio: false }
+                });
+            }
+
+            // 5. Scroll Depth (KQL)
+            const scrollData = await fetchWidgetData('/api/analytics/scroll', 'w8-scroll');
+            if (scrollData) {
+                new Chart(document.getElementById('chart-scroll'), {
+                    type: 'bar',
+                    data: {
+                        labels: scrollData.labels, // e.g. 25%, 50%, 75%, 100%
+                        datasets: [{
+                            label: 'Users reached',
+                            data: scrollData.values,
+                            backgroundColor: colors.primary,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: { maintainAspectRatio: false }
+                });
+            }
+
+            // 6. Exceptions Feed
+            const exceptions = await fetchWidgetData('/api/analytics/exceptions', 'w10-exceptions');
+            if (exceptions && exceptions.length > 0) {
+                const list = document.getElementById('feed-exceptions');
+                list.innerHTML = exceptions.map(e => 
+                    `<li>[${new Date(e.timestamp).toLocaleTimeString()}] <strong>${e.type}</strong>: ${e.message} <br/><span style="color:#888;font-size:10px;">${e.url}</span></li>`
+                ).join('');
+            } else if (exceptions) {
+                document.getElementById('feed-exceptions').innerHTML = '<li>No recent exceptions detected! All good.</li>';
+            }
+
+            // 7. Recent Subscribers
+            const subscribers = await fetchWidgetData('/api/analytics/recent-subscribers', 'w11-subscribers');
+            if (subscribers) {
+                const tbody = document.getElementById('table-subscribers');
+                tbody.innerHTML = subscribers.map(s => `
+                    <tr>
+                        <td><strong>${s.name}</strong></td>
+                        <td>${s.email}</td>
+                        <td><span class="badge ${s.isVerified ? 'verified' : 'pending'}">${s.isVerified ? 'Verified' : 'Pending'}</span></td>
+                    </tr>
+                `).join('');
+            }
+
+            // 8. Recent Inquiries
+            const inquiries = await fetchWidgetData('/api/analytics/recent-inquiries', 'w12-inquiries');
+            if (inquiries) {
+                const tbody = document.getElementById('table-inquiries');
+                tbody.innerHTML = inquiries.map(i => `
+                    <tr>
+                        <td><strong>${i.name}</strong><br><span style="color:#888; font-size:11px;">${i.email}</span></td>
+                        <td>${i.topic}</td>
+                        <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${i.message}">${i.message}</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+    </main>
+</body>
+</html>

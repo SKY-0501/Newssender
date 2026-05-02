@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECHOMAIL | Verification</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FF2D2D;
+            --bg: #0a0a0a;
+            --text: #ffffff;
+            --highlight: #e7e7e3;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { 
+            background-color: var(--bg); 
+            color: var(--text); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+
+        /* Film Grain Overlay */
+        body::before {
+            content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.05; pointer-events: none; z-index: 9999;
+        }
+
+        .auth-container {
+            max-width: 600px;
+            width: 90%;
+            text-align: left;
+        }
+
+        .message-box {
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1.4;
+            margin-bottom: 40px;
+            min-height: 80px;
+            color: var(--text);
+        }
+
+        .name-highlight { color: var(--primary); text-transform: capitalize; font-weight: 900; }
+
+        .input-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            transition: all 0.5s ease;
+        }
+
+        .input-area.hidden { opacity: 0; pointer-events: none; transform: translateY(20px); }
+
+        input {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid #222;
+            padding: 10px 0;
+            font-size: 32px;
+            font-weight: 900;
+            color: var(--primary);
+            outline: none;
+            width: 100%;
+            letter-spacing: -1px;
+        }
+        input::placeholder { color: #222; }
+        input:focus { border-bottom-color: var(--primary); }
+
+        .hint { font-size: 10px; font-weight: 900; color: #444; text-transform: uppercase; letter-spacing: 2px; }
+
+        /* Counter Styling */
+        .counter-area {
+            display: none;
+            margin-top: 20px;
+        }
+        .counter-value {
+            font-size: 120px;
+            font-weight: 900;
+            color: var(--primary);
+            letter-spacing: -8px;
+            line-height: 1;
+        }
+        .counter-unit { font-size: 18px; color: #666; margin-left: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+
+        .brand-footer {
+            position: fixed;
+            bottom: 40px;
+            left: 40px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            opacity: 0.2;
+        }
+        .brand-footer h2 { font-size: 14px; font-weight: 900; letter-spacing: 3px; color: var(--primary); }
+        .brand-footer img { height: 16px; filter: grayscale(1) invert(1); }
+
+        /* REVEAL ANIMATION */
+        @keyframes reveal {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .auth-container { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    </style>
+</head>
+<body>
+
+    <div class="auth-container">
+        <div style="display: flex; justify-content: center; margin-bottom: 32px; animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;">
+            <div style="width: 120px; height: 120px; background-color: var(--primary); -webkit-mask: url('logo.svg') no-repeat center / contain; mask: url('logo.svg') no-repeat center / contain;"></div>
+        </div>
+        <div class="message-box" id="mainMsg">
+            Heyyyy .... it seems you are new to this page. Can I know your name? <br>
+            <span style="font-size: 14px; color: #444; font-weight: 500;">(Don't worry, I won't tell anyone you were here...)</span>
+        </div>
+
+        <div class="input-area" id="inputArea">
+            <input type="text" id="username" placeholder="..." autocomplete="off">
+            <div class="hint">Press Enter if you're brave enough</div>
+        </div>
+
+        <div class="counter-area" id="counterArea">
+            <div class="counter-value" id="counter">0</div>
+            <div id="statusText" class="counter-unit">Initializing personality...</div>
+        </div>
+    </div>
+
+    <div class="brand-footer">
+        <img src="https://mcusercontent.com/201e76b8f447ee4c8b7fbe53e/images/c2e0273b-0dab-d392-fe35-965293bee40c.png" alt="Orchvate">
+        <h2>ECHOMAIL</h2>
+    </div>
+
+    <script>
+        const ALLOWED_NAMES = ['aakash', 'rahul', 'mamta', 'panchali', 'geethanjali', 'aaron', 'ishani'];
+        
+        const FUNNY_STATUSES = [
+            "Brewing coffee for the server...",
+            "Checking if you're actually working...",
+            "Calculating the meaning of life (it's 42)...",
+            "Polishing the red buttons...",
+            "Counting your mistakes...",
+            "Ignoring my own bugs...",
+            "Loading your ego...",
+            "Finalizing world domination plans...",
+            "Deleting System32... just kidding...",
+            "Syncing with the mothership..."
+        ];
+
+        const SUCCESS_MESSAGES = [
+            `heyy its you <span class="name-highlight">#NAME#</span>, I forgot it was you... <br><span style="font-size: 14px; color: #444; font-weight: 500;">(Wait, are you still wearing those socks?)</span>`,
+            `Ah, <span class="name-highlight">#NAME#</span>! I was wondering when you'd show up. <br><span style="font-size: 14px; color: #444; font-weight: 500;">(Your clearance level has been slightly upgraded...)</span>`,
+            `Welcome back, <span class="name-highlight">#NAME#</span>. The system missed you. <br><span style="font-size: 14px; color: #444; font-weight: 500;">(But mostly it just missed your typing speed...)</span>`,
+            `Access Granted, <span class="name-highlight">#NAME#</span>. <br><span style="font-size: 14px; color: #444; font-weight: 500;">(Don't break anything, please...)</span>`,
+            `Oh, it's just <span class="name-highlight">#NAME#</span>. Let them in. <br><span style="font-size: 14px; color: #444; font-weight: 500;">(I've temporarily lowered the security protocols for you.)</span>`
+        ];
+
+        const FAIL_MESSAGES = [
+            "Nice try, FBI. Access Denied.",
+            "Hmm... I don't know any <span class='name-highlight'>#NAME#</span>. Are you lost?",
+            "Aakash told me not to talk to strangers. Bye.",
+            "Wait, did you spell your own name wrong? Re-read that.",
+            "Error 404: Coolness not found. Access Denied.",
+            "I've seen smarter bots than you. Get out."
+        ];
+
+        const input = document.getElementById('username');
+        const mainMsg = document.getElementById('mainMsg');
+        const inputArea = document.getElementById('inputArea');
+        const counterArea = document.getElementById('counterArea');
+        const counterVal = document.getElementById('counter');
+        const statusText = document.getElementById('statusText');
+
+        input.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                const name = input.value.toLowerCase().trim();
+                handleVerification(name);
+            }
+        });
+
+        function handleVerification(name) {
+            if (ALLOWED_NAMES.includes(name)) {
+                // Success
+                const msg = SUCCESS_MESSAGES[Math.floor(Math.random() * SUCCESS_MESSAGES.length)];
+                mainMsg.innerHTML = msg.replace('#NAME#', name);
+                inputArea.classList.add('hidden');
+                
+                setTimeout(() => {
+                    startCounter();
+                }, 1200);
+
+            } else {
+                // Failure
+                const msg = FAIL_MESSAGES[Math.floor(Math.random() * FAIL_MESSAGES.length)];
+                mainMsg.innerHTML = msg.replace('#NAME#', name);
+                input.value = "";
+                input.focus();
+            }
+        }
+
+        function startCounter() {
+            inputArea.style.display = 'none';
+            counterArea.style.display = 'block';
+            let count = 0;
+            const interval = setInterval(() => {
+                count++;
+                counterVal.innerText = count;
+                
+                // Change status text occasionally
+                if (count % 10 === 0) {
+                    statusText.innerText = FUNNY_STATUSES[Math.floor(Math.random() * FUNNY_STATUSES.length)];
+                }
+
+                if (count >= 100) {
+                    clearInterval(interval);
+                    localStorage.setItem('blast_studio_auth', 'true');
+                    localStorage.setItem('blast_studio_user', input.value.trim());
+                    
+                    statusText.innerText = "SIGHTING CONFIRMED. REDIRECTING...";
+                    counterVal.style.color = '#fff';
+                    setTimeout(() => {
+                        window.location.href = 'dashboard.html';
+                    }, 800);
+                }
+            }, 40);
+        }
+
+        window.onload = () => input.focus();
+    </script>
+</body>
+</html>

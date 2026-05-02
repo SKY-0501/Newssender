@@ -1,0 +1,1238 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EchoMail | Sender</title>
+    <link rel="stylesheet" href="sidebar.css">
+    <script src="sidebar.js"></script>
+    <script>
+      if (localStorage.getItem('blast_studio_auth') !== 'true') {
+        window.location.href = 'login.html';
+      }
+    </script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Include Quill Stylesheet -->
+    <link
+      href="https://cdn.quilljs.com/1.3.6/quill.snow.css"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --primary:     #FF2D2D;
+        --secondary:   #FF2D2D;
+        --bg:          #111111;
+        --surface:     #161616;
+        --border:      #333333;
+        --text:        #FFFFFF;
+        --text-sub:    #999999;
+        --text-faint:  #444444;
+        --accent:      #FF2D2D;
+        --sidebar-bg:  #0a0a0a;
+        --sidebar-text:#888888;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: "Inter", sans-serif;
+      }
+      body {
+        background-color: var(--bg);
+        min-height: 100vh;
+        color: var(--text);
+        position: relative;
+        overflow-x: hidden;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        opacity: 0.04;
+        pointer-events: none;
+        z-index: 9999;
+      }
+      body {
+        /* Sidebar layout removed for Top Nav */
+      }
+
+      /* Local Adjustments */
+
+      /* MAIN CONTENT */
+      .main-content {
+        /* Layout handled by sidebar.css */
+        min-height: 100vh;
+        background: var(--bg);
+      }
+
+      .page-header { margin-bottom: 40px; }
+      .page-header h1 {
+        font-size: 30px;
+        font-weight: 900;
+        color: var(--text);
+        letter-spacing: -1px;
+        margin-bottom: 4px;
+      }
+      .page-header p { color: var(--text-sub); font-size: 14px; }
+
+      .dashboard-container {
+        max-width: 1400px;
+        display: grid;
+        grid-template-columns: 1.3fr 0.7fr;
+        gap: 48px;
+      }
+      .left-col { padding-top: 0; }
+      .right-col { padding-top: 40px; }
+
+      /* CARDS — Dashed technical style */
+      .widget {
+        background: #111111;
+        border: 1px dashed #333333;
+        border-radius: 4px;
+        padding: 32px;
+        transition: all 0.2s;
+        position: relative;
+        margin-bottom: 24px;
+      }
+      .widget::before, .widget::after {
+        content: '○';
+        position: absolute;
+        font-size: 10px;
+        color: #444;
+      }
+      .widget::before { top: 10px; left: 10px; }
+      .widget::after { top: 10px; right: 10px; }
+
+      .header h1 {
+        font-weight: 800;
+        font-size: 82px;
+        letter-spacing: -1px;
+        line-height: 0.85;
+        color: #FF2D2D;
+        margin-bottom: 24px;
+      }
+      .header p { 
+        font-size: 16px; 
+        color: #bbbbbb;
+        margin-bottom: 48px;
+        max-width: 600px;
+      }
+      .helper-text {
+        font-size: 13px;
+        color: #777777;
+        margin-top: 8px;
+      }
+      label {
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: #FFFFFF;
+        margin-bottom: 12px;
+        display: block;
+      }
+      .input-group { margin-bottom: 24px; }
+
+      input[type="text"], textarea {
+        width: 100%;
+        padding: 14px 18px;
+        border: 1px solid #1f1f1f;
+        border-radius: 8px;
+        background: #000000;
+        font-size: 15px;
+        color: #ffffff;
+        transition: all 0.15s;
+        outline: none;
+      }
+      input[type="text"]:focus, textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 15px rgba(255, 45, 45, 0.1);
+      }
+
+      /* SEND BUTTON — solid black ink */
+      .btn-send {
+        width: 100%;
+        background: transparent;
+        color: #FF2D2D;
+        border: 1.5px solid #FF2D2D;
+        padding: 20px 24px;
+        border-radius: 100px;
+        font-size: 14px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-top: 12px;
+      }
+      .btn-send:hover {
+        background: #FF2D2D;
+        color: #FFFFFF;
+        box-shadow: 0 0 20px rgba(255, 45, 45, 0.4);
+      }
+      .btn-send:disabled {
+        background: #222222;
+        color: #555555;
+        border-color: #222222;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      /* QUILL EDITOR FIX — Dark text on light background */
+      .ql-container {
+        font-family: 'Inter', sans-serif !important;
+        font-size: 16px !important;
+        background: #ffffff;
+        border-radius: 0 0 12px 12px;
+      }
+      .ql-editor {
+        color: #1a1a1a !important;
+        min-height: 400px;
+      }
+      .ql-toolbar {
+        background: #f1f1f1 !important;
+        border-radius: 12px 12px 0 0;
+        border-color: #333 !important;
+      }
+      .ql-snow.ql-toolbar button .ql-stroke { stroke: #333 !important; }
+      .ql-snow.ql-toolbar button .ql-fill { fill: #333 !important; }
+      .ql-snow.ql-toolbar .ql-picker { color: #333 !important; }
+
+      /* EDITOR */
+      .editor-wrapper {
+        border: 1.5px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+        background: white;
+      }
+      .editor-header {
+        background: #f7f7f5;
+        border-bottom: 1.5px solid var(--border);
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      /* TOGGLE BUTTONS — pill outline style */
+      .toggle-btn {
+        padding: 6px 14px;
+        border-radius: 100px;
+        border: 1.5px solid var(--border);
+        background: transparent;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.15s;
+        color: var(--text-sub);
+      }
+      .toggle-btn:hover {
+        border-color: var(--secondary);
+        color: var(--secondary);
+      }
+      .toggle-btn.active {
+        background: var(--secondary);
+        color: #ffffff;
+        border-color: var(--secondary);
+      }
+
+      /* STUDIO BUTTONS */
+      .studio-btn {
+        padding: 12px 20px;
+        border-radius: 8px;
+        border: 1.5px solid #222;
+        background: transparent;
+        color: #666;
+        font-weight: 800;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .studio-btn:hover { border-color: #444; color: #fff; }
+      .studio-btn.active { background: var(--secondary); color: white; border-color: var(--secondary); }
+      .studio-btn.outline { border-color: var(--secondary); color: var(--secondary); }
+      .studio-btn.outline:hover { background: var(--secondary); color: white; }
+
+      .log {
+        background: #0d0d0d;
+        color: #d4d4d4;
+        padding: 18px 20px;
+        border-radius: 14px;
+        font-family: "JetBrains Mono", 'Courier New', monospace;
+        font-size: 12px;
+        line-height: 1.7;
+        max-height: 260px;
+        overflow-y: auto;
+      }
+
+      /* Status & Progress */
+      .status-area { display: none; margin-top: 20px; }
+      .status-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text-sub);
+        margin-bottom: 10px;
+      }
+      .progress-bar-container {
+        background: var(--border);
+        border-radius: 100px;
+        height: 6px;
+        margin-bottom: 16px;
+        overflow: hidden;
+      }
+      .progress-bar {
+        height: 100%;
+        width: 0%;
+        background: var(--secondary);
+        border-radius: 100px;
+        transition: width 0.3s;
+      }
+
+      /* Spinner */
+      .spinner {
+        display: none;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255,255,255,0.4);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .footer {
+        font-size: 12px;
+        color: var(--text-sub);
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+      }
+
+      @media (max-width: 900px) {
+        .dashboard-container {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* REVEAL ANIMATION */
+      @keyframes reveal {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .sidebar { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .header { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards; opacity: 0; }
+      .dashboard-container { animation: reveal 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards; opacity: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="sidebar-placeholder"></div>
+
+    <main class="main-content">
+      <div class="dashboard-container">
+        <!-- Left Column: Content Editor -->
+        <div class="left-col">
+          <div class="header">
+            <h1>ECHO<span style="color:#e7e7e3">M</span>AIL</h1>
+            <p>Production Suite: Orchvate Dispatch & Telemetry</p>
+          </div>
+
+          <div class="input-group">
+            <label for="subject">Email Subject</label>
+            <input
+              type="text"
+              id="subject"
+              value="Orchvate | Year-in-Review 2025"
+              placeholder="Enter email subject..."
+            />
+          </div>
+
+          <div class="widget">
+            <label style="margin-bottom: 16px">Email Body</label>
+            <div class="editor-wrapper">
+              <!-- Unified Header -->
+              <div class="editor-header">
+                <div id="quill-toolbar-container">
+                  <!-- Quill tools will be moved here -->
+                </div>
+                <div
+                  id="html-toolbar-container"
+                  style="
+                    display: none;
+                    font-size: 13px;
+                    color: #666;
+                    font-weight: 600;
+                    padding: 4px;
+                  "
+                >
+                  Raw HTML Source
+                </div>
+
+                <!-- Toggle Buttons on Right -->
+                <div style="display: flex; gap: 6px">
+                  <button id="visualModeBtn" class="toggle-btn active">
+                    Visual Editor
+                  </button>
+                  <button id="htmlModeBtn" class="toggle-btn inactive">
+                    HTML
+                  </button>
+                </div>
+              </div>
+
+              <!-- Visual Editor -->
+              <div id="visualEditorContainer">
+                <div id="quillEditor" style="height: 400px"></div>
+              </div>
+
+              <!-- HTML Editor -->
+              <div id="htmlEditorContainer" style="display: none">
+                <textarea
+                  id="emailBody"
+                  style="
+                    height: 400px;
+                    width: 100%;
+                    border: none;
+                    border-radius: 0;
+                    outline: none;
+                    padding: 16px;
+                    font-family: &quot;Courier New&quot;, Courier, monospace;
+                    font-size: 14px;
+                    line-height: 1.6;
+                    background-color: #f8f9fa;
+                    color: #333;
+                  "
+                  placeholder="Loading template..."
+                ></textarea>
+              </div>
+            </div>
+
+            <p style="font-size: 12px; color: #666; margin-top: 8px">
+              Edit the content here. The Orchvate header and footer wrapper will
+              be automatically applied around this content.
+            </p>
+          </div> <!-- End widget -->
+        </div> <!-- End left-col -->
+
+        <!-- Right Column: Settings and Sending -->
+        <div class="right-col">
+          <div class="widget">
+            <label>Sender Service</label>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px">
+              <button id="acsSenderBtn" class="studio-btn active" style="flex: 1;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+                ACS
+              </button>
+              <button id="paSenderBtn" class="studio-btn" style="flex: 1;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" /></svg>
+                Automate
+              </button>
+            </div>
+            <p class="helper-text">ACS is recommended for high volume.</p>
+          </div>
+
+          <div class="widget">
+            <label>Recipient Mode</label>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px">
+              <button id="manualModeBtn" class="studio-btn active">Manual Entry</button>
+              <button id="csvModeBtn" class="studio-btn">Load CSV</button>
+              <button id="dbModeBtn" class="studio-btn">Load Live DB</button>
+              <button id="bothModeBtn" class="studio-btn">DB + CSV ✦</button>
+            </div>
+          </div>
+
+          <div id="manualEntryArea" class="widget">
+            <label for="emails">Recipient Emails (one per line)</label>
+            <textarea id="emails" style="height: 150px" placeholder="rahul@orchvate.com&#10;aakash@orchvate.com&#10;..."></textarea>
+          </div>
+
+          <div id="csvEntryArea" class="widget" style="display: none">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+              "
+            >
+              <label style="margin-bottom: 0">CSV Subscribers</label>
+              <button
+                id="addSubscriberBtn"
+                style="
+                  background: var(--secondary);
+                  color: white;
+                  border: none;
+                  padding: 5px 12px;
+                  border-radius: 6px;
+                  cursor: pointer;
+                  font-size: 12px;
+                  font-weight: bold;
+                "
+              >
+                + Add New
+              </button>
+            </div>
+            <div
+              id="subscriberList"
+              style="
+                height: 150px;
+                overflow-y: auto;
+                background: #fdfdfd;
+                border-radius: 12px;
+                padding: 10px;
+                border: 2.5px solid var(--border);
+              "
+            >
+              <p style="color: #888; text-align: center; padding: 20px">
+                Loading subscribers...
+              </p>
+            </div>
+            <button
+              id="saveSubscribersBtn"
+              style="
+                width: 100%;
+                margin-top: 10px;
+                background: white;
+                color: var(--secondary);
+                border: 2px solid var(--secondary);
+                padding: 10px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: bold;
+              "
+            >
+              Save Changes to File
+            </button>
+          </div>
+
+          <div id="dbEntryArea" class="widget" style="display: none">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+              "
+            >
+              <label style="margin-bottom: 0">Verified DB Subscribers</label>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <span
+                  id="dbSubscriberCount"
+                  style="
+                    font-size: 12px;
+                    font-weight: bold;
+                    color: var(--secondary);
+                  "
+                  >0 found</span
+                >
+                <button
+                  onclick="addTempToDb()"
+                  style="
+                    background: var(--secondary);
+                    color: white;
+                    border: none;
+                    padding: 4px 10px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: bold;
+                  "
+                >
+                  + Add
+                </button>
+              </div>
+            </div>
+            <div
+              id="dbSubscriberList"
+              style="
+                height: 150px;
+                overflow-y: auto;
+                background: #fdfdfd;
+                border-radius: 12px;
+                padding: 10px;
+                border: 2.5px solid var(--border);
+              "
+            >
+              <p style="color: #888; text-align: center; padding: 20px">
+                Loading from database...
+              </p>
+            </div>
+            <p style="font-size: 12px; color: #666; margin-top: 8px">
+              DB subscribers cannot be edited. Use × to exclude from this send
+              only. Use + to add a temporary email.
+            </p>
+          </div>
+
+          <div id="bothEntryArea" class="widget" style="display: none">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+              "
+            >
+              <label style="margin-bottom: 0"
+                >Merged Subscribers
+                <span
+                  style="
+                    font-size: 11px;
+                    color: #888;
+                    font-weight: normal;
+                    text-transform: none;
+                    letter-spacing: 0;
+                  "
+                  >(DB + CSV)</span
+                ></label
+              >
+              <div style="display: flex; align-items: center; gap: 8px">
+                <span
+                  id="bothSubscriberCount"
+                  style="
+                    font-size: 12px;
+                    font-weight: bold;
+                    color: var(--secondary);
+                  "
+                  >0 unique</span
+                >
+                <button
+                  onclick="addTempToBoth()"
+                  style="
+                    background: var(--secondary);
+                    color: white;
+                    border: none;
+                    padding: 4px 10px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: bold;
+                  "
+                >
+                  + Add
+                </button>
+              </div>
+            </div>
+            <div
+              id="bothSubscriberList"
+              style="
+                height: 150px;
+                overflow-y: auto;
+                background: #fdfdfd;
+                border-radius: 12px;
+                padding: 10px;
+                border: 2.5px solid var(--border);
+              "
+            >
+              <p style="color: #888; text-align: center; padding: 20px">
+                Click to load and merge...
+              </p>
+            </div>
+            <p style="font-size: 12px; color: #666; margin-top: 8px">
+              Deduped by email. Use × to exclude from this send. Use + to add a
+              temporary extra email. Nothing is saved to DB or CSV.
+            </p>
+          </div>
+
+          <button id="sendBtn" class="btn-send">
+            <div id="spinner" class="spinner"></div>
+            <span id="btnText">Blast Newsletter</span>
+          </button>
+
+          <div id="statusArea" class="status-area">
+            <div class="status-header">
+              <span id="currentStatus" style="font-family: 'Caveat', cursive; font-size: 22px; color: #FF2D2D;">Show up - it SHOWS OUT!</span>
+              <span id="percentage">0%</span>
+            </div>
+            <div class="progress-bar-container">
+              <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <div id="log" class="log"></div>
+          </div>
+
+          <div class="footer" style="margin-top: 20px">
+            &copy; 2025 Orchvate. Built for internal use.
+          </div>
+        </div>
+      </div>
+
+      <!-- Quill JS -->
+      <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+      <script>
+        // Initialize Quill
+        const quill = new Quill("#quillEditor", {
+          theme: "snow",
+          modules: {
+            toolbar: [
+              [{ header: [1, 2, 3, false] }],
+              ["bold", "italic", "underline", "strike"],
+              [{ list: "ordered" }, { list: "bullet" }],
+              ["link", "image"],
+              ["clean"],
+            ],
+          },
+        });
+
+        // Move the Quill toolbar into our custom header on the left side
+        const defaultToolbar = document.querySelector(".ql-toolbar");
+        const customContainer = document.getElementById(
+          "quill-toolbar-container",
+        );
+        customContainer.appendChild(defaultToolbar);
+
+        let editorMode = "visual"; // visual or html
+        const visualModeBtn = document.getElementById("visualModeBtn");
+        const htmlModeBtn = document.getElementById("htmlModeBtn");
+        const visualEditorContainer = document.getElementById(
+          "visualEditorContainer",
+        );
+        const htmlEditorContainer = document.getElementById(
+          "htmlEditorContainer",
+        );
+        const quillToolbarContainer = document.getElementById(
+          "quill-toolbar-container",
+        );
+        const htmlToolbarContainer = document.getElementById(
+          "html-toolbar-container",
+        );
+        const emailBodyInput = document.getElementById("emailBody");
+
+        visualModeBtn.addEventListener("click", () => {
+          editorMode = "visual";
+          visualModeBtn.className = "toggle-btn active";
+          htmlModeBtn.className = "toggle-btn inactive";
+          visualEditorContainer.style.display = "block";
+          quillToolbarContainer.style.display = "block";
+          htmlEditorContainer.style.display = "none";
+          htmlToolbarContainer.style.display = "none";
+          // Sync HTML to Visual
+          quill.clipboard.dangerouslyPasteHTML(emailBodyInput.value);
+        });
+
+        htmlModeBtn.addEventListener("click", () => {
+          editorMode = "html";
+          htmlModeBtn.className = "toggle-btn active";
+          visualModeBtn.className = "toggle-btn inactive";
+          htmlEditorContainer.style.display = "block";
+          htmlToolbarContainer.style.display = "block";
+          visualEditorContainer.style.display = "none";
+          quillToolbarContainer.style.display = "none";
+          // Sync Visual to HTML
+          let rawHtml = quill.root.innerHTML;
+          // Add basic newlines for readability
+          rawHtml = rawHtml.replace(/><\/p>/g, ">\n</p>");
+          rawHtml = rawHtml.replace(/></g, ">\n<");
+          emailBodyInput.value = rawHtml.trim();
+        });
+
+        // Load Template on Startup
+        async function loadTemplate() {
+          try {
+            const res = await fetch("/api/template");
+            if (res.ok) {
+              const html = await res.text();
+              emailBodyInput.value = html;
+              quill.clipboard.dangerouslyPasteHTML(html);
+            } else {
+              emailBodyInput.placeholder = "Failed to load template.";
+              quill.setText("Failed to load template.");
+            }
+          } catch (e) {
+            emailBodyInput.placeholder = "Error loading template.";
+            quill.setText("Error loading template.");
+          }
+        }
+        loadTemplate();
+
+        // --- Rest of the functionality ---
+
+        const sendBtn = document.getElementById("sendBtn");
+        const btnText = document.getElementById("btnText");
+        const spinner = document.getElementById("spinner");
+        const emailsInput = document.getElementById("emails");
+        const subjectInput = document.getElementById("subject");
+        const statusArea = document.getElementById("statusArea");
+        const log = document.getElementById("log");
+        const progressBar = document.getElementById("progressBar");
+        const percentageText = document.getElementById("percentage");
+        const currentStatus = document.getElementById("currentStatus");
+
+        const manualModeBtn = document.getElementById("manualModeBtn");
+        const csvModeBtn = document.getElementById("csvModeBtn");
+        const dbModeBtn = document.getElementById("dbModeBtn");
+        const bothModeBtn = document.getElementById("bothModeBtn");
+        const manualEntryArea = document.getElementById("manualEntryArea");
+        const csvEntryArea = document.getElementById("csvEntryArea");
+        const dbEntryArea = document.getElementById("dbEntryArea");
+        const bothEntryArea = document.getElementById("bothEntryArea");
+
+        const subscriberList = document.getElementById("subscriberList");
+        const addSubscriberBtn = document.getElementById("addSubscriberBtn");
+        const saveSubscribersBtn =
+          document.getElementById("saveSubscribersBtn");
+
+        const dbSubscriberList = document.getElementById("dbSubscriberList");
+        const dbSubscriberCount = document.getElementById("dbSubscriberCount");
+        const bothSubscriberList =
+          document.getElementById("bothSubscriberList");
+        const bothSubscriberCount = document.getElementById(
+          "bothSubscriberCount",
+        );
+
+        const acsSenderBtn = document.getElementById("acsSenderBtn");
+        const paSenderBtn = document.getElementById("paSenderBtn");
+        const senderNote = document.getElementById("senderNote");
+
+        let mode = "manual"; // 'manual', 'csv', 'db', or 'both'
+        let senderType = "ACS";
+        let loadedSubscribers = [];
+        let dbSubscribers = [];
+        let mergedSubscribers = [];
+
+        function addLog(message, type = "info", id = null) {
+          const entry = document.createElement("div");
+          entry.className = type;
+          if (id) entry.id = id;
+          const time = new Date().toLocaleTimeString();
+          entry.innerHTML = `[${time}] ${message}`;
+          log.appendChild(entry);
+          log.scrollTop = log.scrollHeight;
+        }
+
+        function updateLog(id, message, type) {
+          const entry = document.getElementById(id);
+          if (entry) {
+            entry.className = type;
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `[${time}] ${message}`;
+          }
+        }
+
+        async function wait(ms) {
+          return new Promise((resolve) => setTimeout(resolve, ms));
+        }
+
+        acsSenderBtn.addEventListener("click", () => {
+          senderType = "ACS";
+          acsSenderBtn.style.background = "var(--secondary)";
+          acsSenderBtn.style.color = "white";
+          acsSenderBtn.style.border = "none";
+          paSenderBtn.style.background = "transparent";
+          paSenderBtn.style.color = "var(--primary)";
+          paSenderBtn.style.border = "1px solid var(--primary)";
+          senderNote.innerText = "ACS is recommended for high volume.";
+        });
+
+        paSenderBtn.addEventListener("click", () => {
+          senderType = "POWER_AUTOMATE";
+          paSenderBtn.style.background = "var(--primary)";
+          paSenderBtn.style.color = "white";
+          paSenderBtn.style.border = "none";
+          acsSenderBtn.style.background = "transparent";
+          acsSenderBtn.style.color = "var(--secondary)";
+          acsSenderBtn.style.border = "1px solid var(--secondary)";
+          senderNote.innerText = "Power Automate uses your backup flow URL.";
+        });
+
+        function setAllModeBtnsInactive() {
+          manualModeBtn.className = "toggle-btn inactive";
+          csvModeBtn.className = "toggle-btn inactive";
+          dbModeBtn.className = "toggle-btn inactive";
+          bothModeBtn.style.background = "transparent";
+          bothModeBtn.style.color = "var(--primary)";
+          bothModeBtn.style.border = "1px solid var(--primary)";
+        }
+
+        manualModeBtn.addEventListener("click", () => {
+          mode = "manual";
+          manualEntryArea.style.display = "block";
+          csvEntryArea.style.display = "none";
+          dbEntryArea.style.display = "none";
+          bothEntryArea.style.display = "none";
+          setAllModeBtnsInactive();
+          manualModeBtn.className = "toggle-btn active";
+        });
+
+        csvModeBtn.addEventListener("click", async () => {
+          mode = "csv";
+          manualEntryArea.style.display = "none";
+          csvEntryArea.style.display = "block";
+          dbEntryArea.style.display = "none";
+          bothEntryArea.style.display = "none";
+          setAllModeBtnsInactive();
+          csvModeBtn.className = "toggle-btn active";
+          if (loadedSubscribers.length === 0) await fetchSubscribers();
+        });
+
+        dbModeBtn.addEventListener("click", async () => {
+          mode = "db";
+          manualEntryArea.style.display = "none";
+          csvEntryArea.style.display = "none";
+          dbEntryArea.style.display = "block";
+          bothEntryArea.style.display = "none";
+          setAllModeBtnsInactive();
+          dbModeBtn.className = "toggle-btn active";
+          if (dbSubscribers.length === 0) await fetchDbSubscribers();
+        });
+
+        bothModeBtn.addEventListener("click", async () => {
+          mode = "both";
+          manualEntryArea.style.display = "none";
+          csvEntryArea.style.display = "none";
+          dbEntryArea.style.display = "none";
+          bothEntryArea.style.display = "block";
+          setAllModeBtnsInactive();
+          bothModeBtn.className = "toggle-btn active";
+          await fetchAndMerge();
+        });
+
+        // Deduplication: merge DB + CSV, email is key (case-insensitive), DB takes priority
+        function mergeAndDeduplicate(dbList, csvList) {
+          const seen = new Map();
+          // DB subscribers first (higher priority)
+          for (const s of dbList) {
+            const key = s.email.toLowerCase().trim();
+            seen.set(key, { name: s.name, email: s.email, source: "DB" });
+          }
+          // CSV subscribers - only add if email not already in map
+          for (const s of csvList) {
+            const key = s.email.toLowerCase().trim();
+            if (!seen.has(key)) {
+              seen.set(key, { name: s.name, email: s.email, source: "CSV" });
+            }
+          }
+          return Array.from(seen.values());
+        }
+
+        async function fetchAndMerge() {
+          bothSubscriberList.innerHTML =
+            '<p style="color: #888; text-align: center; padding: 20px;">Fetching and merging...</p>';
+          try {
+            const [dbRes, csvRes] = await Promise.all([
+              fetch("/api/db-subscribers"),
+              fetch("/api/subscribers"),
+            ]);
+            dbSubscribers = dbRes.ok ? await dbRes.json() : [];
+            loadedSubscribers = csvRes.ok ? await csvRes.json() : [];
+            mergedSubscribers = mergeAndDeduplicate(
+              dbSubscribers,
+              loadedSubscribers,
+            );
+            renderMergedSubscribers();
+          } catch (err) {
+            bothSubscriberList.innerHTML =
+              '<p style="color: red; text-align: center; padding: 20px;">Error fetching data.</p>';
+          }
+        }
+
+        function buildRow(s, i, listName) {
+          var source = s.source || (listName === "db" ? "DB" : "CSV");
+          var bg = source === "TEMP" ? "#fefefe" : "transparent";
+          var border = source === "TEMP" ? "#666" : "#d6d6d0";
+          var badge = "#0a0a0a";
+          var badgeText = source === "TEMP" ? "&#9998;" : source;
+          var removeFunc =
+            listName === "merged"
+              ? "removeMerged"
+              : listName === "db"
+                ? "removeFromDb"
+                : "deleteSubscriber";
+          var nameCell, emailCell;
+          if (source === "TEMP") {
+            nameCell =
+              '<input type="text" placeholder="Name" value="' +
+              (s.name || "") +
+              '" onchange="' +
+              listName +
+              "Subscribers[" +
+              i +
+              '].name=this.value" style="width:100%;border:none;outline:none;font-size:13px;font-weight:bold;color:#150e56;background:transparent;">';
+            emailCell =
+              '<input type="email" placeholder="email@example.com" value="' +
+              (s.email || "") +
+              '" onchange="' +
+              listName +
+              "Subscribers[" +
+              i +
+              '].email=this.value" style="width:100%;border:none;outline:none;font-size:13px;color:#555;background:transparent;">';
+          } else {
+            nameCell = s.name || "Unknown";
+            emailCell = s.email || "";
+          }
+          return (
+            '<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;padding:8px;border-radius:12px;background:' +
+            bg +
+            ";border:3px solid " +
+            border +
+            ';">' +
+            '<div style="flex:1;font-size:13px;font-weight:900;color:#131313;">' +
+            nameCell +
+            "</div>" +
+            '<div style="flex:1.5;font-size:13px;color:#333;">' +
+            emailCell +
+            "</div>" +
+            '<div style="font-size:11px;padding:2px 6px;border-radius:4px;font-weight:bold;background:' +
+            badge +
+            ';color:white;min-width:36px;text-align:center;">' +
+            badgeText +
+            "</div>" +
+            '<button onclick="' +
+            removeFunc +
+            "(" +
+            i +
+            ')" style="background:#ffeded;color:#f44747;border:none;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">&times;</button>' +
+            "</div>"
+          );
+        }
+
+        function renderMergedSubscribers() {
+          bothSubscriberCount.innerText = mergedSubscribers.length + " unique";
+          if (mergedSubscribers.length === 0) {
+            bothSubscriberList.innerHTML =
+              '<p style="color:#888;text-align:center;padding:20px;">No subscribers found.</p>';
+            return;
+          }
+          bothSubscriberList.innerHTML = mergedSubscribers
+            .map(function (s, i) {
+              return buildRow(s, i, "merged");
+            })
+            .join("");
+        }
+
+        function removeMerged(i) {
+          mergedSubscribers.splice(i, 1);
+          renderMergedSubscribers();
+        }
+
+        function addTempToBoth() {
+          mergedSubscribers.push({ name: "", email: "", source: "TEMP" });
+          renderMergedSubscribers();
+          // Scroll to bottom of list
+          setTimeout(() => {
+            bothSubscriberList.scrollTop = bothSubscriberList.scrollHeight;
+          }, 50);
+        }
+
+        async function fetchDbSubscribers() {
+          try {
+            dbSubscriberList.innerHTML =
+              '<p style="color: #888; text-align: center; padding: 20px;">Fetching from DB...</p>';
+            const res = await fetch("/api/db-subscribers");
+            if (!res.ok) throw new Error("Failed to load");
+            dbSubscribers = await res.json();
+            renderDbSubscribers();
+          } catch (err) {
+            dbSubscriberList.innerHTML = `<p style="color: red; text-align: center; padding: 20px;">Database connection error.</p>`;
+          }
+        }
+
+        function renderDbSubscribers() {
+          dbSubscriberCount.innerText = dbSubscribers.length + " found";
+          if (dbSubscribers.length === 0) {
+            dbSubscriberList.innerHTML =
+              '<p style="color:#888;text-align:center;padding:20px;">No verified subscribers found in database.</p>';
+            return;
+          }
+          dbSubscriberList.innerHTML = dbSubscribers
+            .map(function (s, i) {
+              return buildRow(s, i, "db");
+            })
+            .join("");
+        }
+
+        function removeFromDb(i) {
+          dbSubscribers.splice(i, 1);
+          renderDbSubscribers();
+        }
+
+        function addTempToDb() {
+          dbSubscribers.push({ name: "", email: "", source: "TEMP" });
+          renderDbSubscribers();
+          setTimeout(function () {
+            dbSubscriberList.scrollTop = dbSubscriberList.scrollHeight;
+          }, 50);
+        }
+
+        async function fetchSubscribers() {
+          try {
+            const res = await fetch("/api/subscribers");
+            loadedSubscribers = res.ok ? await res.json() : [];
+            renderSubscribers();
+          } catch (err) {
+            subscriberList.innerHTML =
+              '<p style="color: red; text-align: center; padding: 20px;">Error loading subscribers.</p>';
+          }
+        }
+
+        addSubscriberBtn.addEventListener("click", () => {
+          loadedSubscribers.push({ name: "", email: "" });
+          renderSubscribers();
+        });
+
+        saveSubscribersBtn.addEventListener("click", async () => {
+          updateSubscribersFromUI();
+          saveSubscribersBtn.disabled = true;
+          saveSubscribersBtn.innerText = "Saving...";
+          try {
+            const res = await fetch("/api/subscribers", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(loadedSubscribers),
+            });
+            if (res.ok) alert("Successfully saved to subscribers.csv!");
+            else alert("Error saving to file.");
+          } catch (err) {
+            alert("Connection error.");
+          } finally {
+            saveSubscribersBtn.disabled = false;
+            saveSubscribersBtn.innerText = "Save Changes";
+          }
+        });
+
+        function updateSubscribersFromUI() {
+          const rows = subscriberList.querySelectorAll(".subscriber-row");
+          loadedSubscribers = Array.from(rows)
+            .map((row) => ({
+              name: row.querySelector(".name-input").value.trim(),
+              email: row.querySelector(".email-input").value.trim(),
+            }))
+            .filter((s) => s.email !== "");
+        }
+
+        function renderSubscribers() {
+          if (!loadedSubscribers || loadedSubscribers.length === 0) {
+            subscriberList.innerHTML =
+              '<p style="color: #888; text-align: center; padding: 20px;">No subscribers found in CSV.</p>';
+            return;
+          }
+          subscriberList.innerHTML = loadedSubscribers
+            .map(function (s, i) {
+              s.source = "CSV"; // Tag for styling
+              return buildRow(s, i, "loaded");
+            })
+            .join("");
+        }
+
+        function deleteSubscriber(i) {
+          loadedSubscribers.splice(i, 1);
+          renderSubscribers();
+        }
+
+        sendBtn.addEventListener("click", async () => {
+          const subject = subjectInput.value.trim();
+
+          // Get content based on active mode
+          const bodyContent =
+            editorMode === "visual"
+              ? quill.root.innerHTML
+              : emailBodyInput.value;
+
+          let recipients = [];
+          if (mode === "manual") {
+            const text = emailsInput.value.trim();
+            if (!text) return alert("Please enter emails.");
+            recipients = text
+              .split("\n")
+              .map((e) => ({ email: e.trim(), name: "" }))
+              .filter((e) => e.email !== "");
+          } else if (mode === "csv") {
+            updateSubscribersFromUI();
+            if (loadedSubscribers.length === 0)
+              return alert("No valid subscribers in CSV.");
+            recipients = loadedSubscribers;
+          } else if (mode === "db") {
+            if (dbSubscribers.length === 0)
+              return alert("No valid subscribers in Database.");
+            recipients = dbSubscribers;
+          } else if (mode === "both") {
+            if (mergedSubscribers.length === 0)
+              return alert('Please click "DB + CSV" to load and merge first.');
+            recipients = mergedSubscribers;
+          }
+
+          if (!confirm(`Send to ${recipients.length} recipients?`)) return;
+
+          // Generate a unique Batch ID for this specific blast session
+          const batchId = "BLAST-" + Date.now();
+
+          sendBtn.disabled = true;
+          spinner.style.display = "block";
+          btnText.innerText = "Sending...";
+          statusArea.style.display = "block";
+          log.innerHTML = "";
+          addLog(`Starting broadcast [ID: ${batchId}]...`, "info");
+
+          let sentCount = 0;
+          let failedCount = 0;
+
+          for (let i = 0; i < recipients.length; i++) {
+            const person = recipients[i];
+            currentStatus.innerText = `Sending to ${person.email}...`;
+
+            try {
+              const response = await fetch("/api/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  email: person.email,
+                  name: person.name,
+                  subject,
+                  senderType,
+                  body: bodyContent,
+                  batchId: batchId, // Grouping emails together
+                }),
+              });
+
+              const data = await response.json();
+
+              if (response.ok) {
+                sentCount++;
+                addLog(`✓ Sent to ${person.email}`, "success");
+              } else {
+                failedCount++;
+                addLog(`✗ Failed for ${person.email}`, "error");
+              }
+            } catch (err) {
+              failedCount++;
+              addLog(`✗ Net Error: ${person.email}`, "error");
+            }
+
+            const progress = Math.round(((i + 1) / recipients.length) * 100);
+            progressBar.style.width = `${progress}%`;
+            percentage.innerText = `${progress}%`;
+            if (i < recipients.length - 1) await wait(1000);
+          }
+
+          spinner.style.display = "none";
+          sendBtn.disabled = false;
+          btnText.innerText = "New Blast";
+          currentStatus.innerText = "Completed";
+          addLog(
+            `Broadcast finished. Sent: ${sentCount}, Failed: ${failedCount}`,
+            "success",
+          );
+        });
+      </script>
+    </main>
+  </body>
+</html>
