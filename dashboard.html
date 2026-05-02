@@ -7,9 +7,44 @@
     <link rel="stylesheet" href="sidebar.css">
     <script src="sidebar.js"></script>
     <script>
-      if (localStorage.getItem('blast_studio_auth') !== 'true') {
-        window.location.href = 'login.html';
+      let currentUserEmail = sessionStorage.getItem('userEmail');
+      
+      async function checkAuthStatus() {
+        // If we already verified in this session, just apply the UI rules
+        if (currentUserEmail) {
+          applySecurityRules(currentUserEmail);
+          return;
+        }
+
+        try {
+          const res = await fetch('/api/auth/user');
+          const data = await res.json();
+          if (!data.isAuthenticated) {
+            window.location.href = 'login.html';
+            return;
+          }
+          currentUserEmail = data.email?.toLowerCase();
+          sessionStorage.setItem('userEmail', currentUserEmail);
+          applySecurityRules(currentUserEmail);
+        } catch (e) {
+          window.location.href = 'login.html';
+        }
       }
+
+      function applySecurityRules(email) {
+        const allowed = ['aakash.padyachi@orchvate.com', 'rahul.rajesh@orchvate.com'];
+        const sendBtn = document.getElementById('sendBtn');
+        if (sendBtn && !allowed.includes(email)) {
+          sendBtn.disabled = true;
+          sendBtn.style.opacity = '0.5';
+          sendBtn.style.cursor = 'not-allowed';
+          sendBtn.title = 'Only Aakash or Rahul can send newsletters';
+          const btnText = document.getElementById('btnText');
+          if (btnText) btnText.innerText = 'Sending Restricted';
+        }
+      }
+
+      checkAuthStatus();
     </script>
     <link
       href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;600;700&display=swap"
@@ -93,7 +128,7 @@
       /* CARDS — Dashed technical style */
       .widget {
         background: #111111;
-        border: 1px dashed #333333;
+        border: 2px dashed #555555;
         border-radius: 4px;
         padding: 32px;
         transition: all 0.2s;
@@ -111,7 +146,7 @@
 
       .header h1 {
         font-weight: 800;
-        font-size: 82px;
+        font-size: 92px;
         letter-spacing: -1px;
         line-height: 0.85;
         color: #FF2D2D;
@@ -122,6 +157,18 @@
         color: #bbbbbb;
         margin-bottom: 48px;
         max-width: 600px;
+      }
+      .header-logo {
+        height: 110px;
+        width: 110px;
+        background-color: #FF2D2D;
+        -webkit-mask: url('logo.svg') no-repeat center / contain;
+        mask: url('logo.svg') no-repeat center / contain;
+        flex-shrink: 0;
+        transition: transform 0.3s ease;
+      }
+      .header-logo:hover {
+        transform: scale(1.05) rotate(-5deg);
       }
       .helper-text {
         font-size: 13px;
@@ -345,6 +392,84 @@
       .sidebar { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       .header { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards; opacity: 0; }
       .dashboard-container { animation: reveal 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards; opacity: 0; }
+      /* MODAL STYLES */
+      .modal-backdrop {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.85);
+        backdrop-filter: blur(10px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20000;
+        animation: fadeIn 0.3s ease;
+      }
+      .modal-content {
+        background: #161616;
+        border: 1px solid #333;
+        border-radius: 16px;
+        padding: 32px;
+        width: 100%;
+        max-width: 400px;
+        text-align: center;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      }
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .modal-header h2 {
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      .modal-content p {
+        color: #999;
+        font-size: 14px;
+        margin-bottom: 24px;
+      }
+      .modal-content input {
+        margin-bottom: 24px;
+        text-align: center;
+        font-size: 18px;
+        letter-spacing: 4px;
+      }
+      .modal-actions {
+        display: flex;
+        gap: 12px;
+      }
+      .modal-btn-primary {
+        flex: 2;
+        background: #FF2D2D;
+        color: white;
+        border: none;
+        padding: 14px;
+        border-radius: 8px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+      .modal-btn-secondary {
+        flex: 1;
+        background: transparent;
+        color: #999;
+        border: 1px solid #333;
+        padding: 14px;
+        border-radius: 8px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+      .modal-btn-primary:hover { opacity: 0.9; }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
     </style>
   </head>
   <body>
@@ -354,9 +479,12 @@
       <div class="dashboard-container">
         <!-- Left Column: Content Editor -->
         <div class="left-col">
-          <div class="header">
-            <h1>ECHO<span style="color:#e7e7e3">M</span>AIL</h1>
-            <p>Production Suite: Orchvate Dispatch & Telemetry</p>
+          <div class="header" style="display: flex; align-items: center; gap: 12px; margin-bottom: 32px;">
+            <div class="header-logo"></div>
+            <div>
+              <h1 style="margin-bottom: 0; line-height: 1;">ECHO<span style="color:#e7e7e3">M</span>AIL</h1>
+              <p style="margin-top: -4px;">Production Suite: Orchvate Dispatch & Telemetry</p>
+            </div>
           </div>
 
           <div class="input-group">
@@ -672,6 +800,22 @@
 
           <div class="footer" style="margin-top: 20px">
             &copy; 2025 Orchvate. Built for internal use.
+          </div>
+        </div>
+      </div>
+
+      <!-- Safety Password Modal -->
+      <div id="safetyModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-content">
+          <div class="modal-header">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF2D2D" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            <h2>Safety Protocol</h2>
+          </div>
+          <p>Enter the security code to authorize this blast.</p>
+          <input type="password" id="modalPwdInput" placeholder="Enter code..." autocomplete="off">
+          <div class="modal-actions">
+            <button id="cancelModalBtn" class="modal-btn-secondary">Cancel</button>
+            <button id="confirmModalBtn" class="modal-btn-primary">Authorize Blast</button>
           </div>
         </div>
       </div>
@@ -1170,6 +1314,53 @@
             recipients = mergedSubscribers;
           }
 
+          // --- Custom Modal Safety Check ---
+          function showSafetyModal() {
+            return new Promise((resolve) => {
+              const modal = document.getElementById('safetyModal');
+              const input = document.getElementById('modalPwdInput');
+              const confirmBtn = document.getElementById('confirmModalBtn');
+              const cancelBtn = document.getElementById('cancelModalBtn');
+              
+              input.value = '';
+              modal.style.display = 'flex';
+              input.focus();
+
+              function handleConfirm() {
+                const val = input.value;
+                modal.style.display = 'none';
+                cleanup();
+                resolve(val);
+              }
+
+              function handleCancel() {
+                modal.style.display = 'none';
+                cleanup();
+                resolve(null);
+              }
+
+              function cleanup() {
+                confirmBtn.removeEventListener('click', handleConfirm);
+                cancelBtn.removeEventListener('click', handleCancel);
+                input.removeEventListener('keypress', handleKeypress);
+              }
+
+              function handleKeypress(e) {
+                if (e.key === 'Enter') handleConfirm();
+              }
+
+              confirmBtn.addEventListener('click', handleConfirm);
+              cancelBtn.addEventListener('click', handleCancel);
+              input.addEventListener('keypress', handleKeypress);
+            });
+          }
+
+          const safetyPwd = await showSafetyModal();
+          if (safetyPwd !== "ECHO12345") {
+            if (safetyPwd !== null) alert("Incorrect Safety Password. Blast cancelled.");
+            return;
+          }
+
           if (!confirm(`Send to ${recipients.length} recipients?`)) return;
 
           // Generate a unique Batch ID for this specific blast session
@@ -1200,6 +1391,7 @@
                   senderType,
                   body: bodyContent,
                   batchId: batchId, // Grouping emails together
+                  safetyPassword: safetyPwd
                 }),
               });
 

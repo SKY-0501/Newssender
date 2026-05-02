@@ -175,6 +175,26 @@
         const counterVal = document.getElementById('counter');
         const statusText = document.getElementById('statusText');
 
+        // Check if already authenticated on load
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/user');
+                const user = await res.json();
+                if (user.isAuthenticated) {
+                    // Check if the user email is from orchvate
+                    if (user.email.endsWith('@orchvate.com')) {
+                        mainMsg.innerHTML = `Welcome back, <span class="name-highlight">${user.name}</span>. <br><span style="font-size: 14px; color: #444; font-weight: 500;">(Identity verified via Microsoft. Redirecting...)</span>`;
+                        inputArea.style.display = 'none';
+                        setTimeout(() => {
+                            window.location.href = 'dashboard.html';
+                        }, 1500);
+                    } else {
+                        mainMsg.innerHTML = `Access Denied. <br><span style="font-size: 14px; color: var(--primary); font-weight: 500;">(Your Microsoft account ${user.email} is not authorized for this system.)</span>`;
+                    }
+                }
+            } catch (e) { console.log("Auth check failed"); }
+        }
+
         input.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 const name = input.value.toLowerCase().trim();
@@ -184,15 +204,11 @@
 
         function handleVerification(name) {
             if (ALLOWED_NAMES.includes(name)) {
-                // Success
+                // Success - Phase 1
                 const msg = SUCCESS_MESSAGES[Math.floor(Math.random() * SUCCESS_MESSAGES.length)];
-                mainMsg.innerHTML = msg.replace('#NAME#', name);
+                mainMsg.innerHTML = msg.replace('#NAME#', name) + `<br><br><button onclick="triggerAzure()" style="background: var(--primary); color: white; border: none; padding: 12px 24px; font-weight: 900; cursor: pointer; border-radius: 4px; animation: reveal 0.5s ease forwards;">VERIFY WITH MICROSOFT</button>`;
                 inputArea.classList.add('hidden');
-                
-                setTimeout(() => {
-                    startCounter();
-                }, 1200);
-
+                inputArea.style.pointerEvents = 'none';
             } else {
                 // Failure
                 const msg = FAIL_MESSAGES[Math.floor(Math.random() * FAIL_MESSAGES.length)];
@@ -202,34 +218,14 @@
             }
         }
 
-        function startCounter() {
-            inputArea.style.display = 'none';
-            counterArea.style.display = 'block';
-            let count = 0;
-            const interval = setInterval(() => {
-                count++;
-                counterVal.innerText = count;
-                
-                // Change status text occasionally
-                if (count % 10 === 0) {
-                    statusText.innerText = FUNNY_STATUSES[Math.floor(Math.random() * FUNNY_STATUSES.length)];
-                }
-
-                if (count >= 100) {
-                    clearInterval(interval);
-                    localStorage.setItem('blast_studio_auth', 'true');
-                    localStorage.setItem('blast_studio_user', input.value.trim());
-                    
-                    statusText.innerText = "SIGHTING CONFIRMED. REDIRECTING...";
-                    counterVal.style.color = '#fff';
-                    setTimeout(() => {
-                        window.location.href = 'dashboard.html';
-                    }, 800);
-                }
-            }, 40);
+        function triggerAzure() {
+            window.location.href = '/login-microsoft';
         }
 
-        window.onload = () => input.focus();
+        window.onload = () => {
+            input.focus();
+            checkAuth();
+        };
     </script>
 </body>
 </html>

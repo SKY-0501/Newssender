@@ -73,9 +73,67 @@
   margin-right: 12px;
 }
 
+.sidebar-footer-group {
+  margin-top: auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  padding: 0 10px;
+  box-sizing: border-box;
+}
+
+.logout-link {
+  text-decoration: none !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 15px;
+  border-radius: 100px;
+  transition: all 0.3s;
+  display: flex !important;
+  align-items: center;
+  justify-content: center; /* Centered by default */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.logout-link svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  stroke: currentColor !important;
+  stroke-width: 2;
+  transition: all 0.3s;
+}
+
+.logout-link span {
+  opacity: 0;
+  width: 0;
+  white-space: nowrap;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: right;
+}
+
+.sidebar:hover .logout-link {
+  background: rgba(255, 45, 45, 0.1); /* Red tint on hover */
+  color: #FF2D2D;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+}
+
+.sidebar:hover .logout-link span {
+  opacity: 1;
+  width: auto;
+  flex-grow: 1;
+  margin-right: 15px;
+}
+
 .sidebar-footer {
-  margin-top: auto; /* Pushes footer to bottom */
-  padding: 20px 0 0 0;
+  padding: 15px 0 10px 0;
   display: flex;
   justify-content: center;
   align-items: center;

@@ -7,9 +7,22 @@
     <link rel="stylesheet" href="sidebar.css">
     <script src="sidebar.js"></script>
     <script>
-        if (localStorage.getItem('blast_studio_auth') !== 'true') {
+      let currentUserEmail = sessionStorage.getItem('userEmail');
+      async function checkAuthStatus() {
+        if (currentUserEmail) return;
+        try {
+          const res = await fetch('/api/auth/user');
+          const data = await res.json();
+          if (!data.isAuthenticated) {
             window.location.href = 'login.html';
+            return;
+          }
+          sessionStorage.setItem('userEmail', data.email?.toLowerCase());
+        } catch (e) {
+          window.location.href = 'login.html';
         }
+      }
+      checkAuthStatus();
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

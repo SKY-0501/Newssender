@@ -6,17 +6,60 @@ using System.Net.Http.Json;
 using Npgsql;
 using Azure.Monitor.Query;
 using Azure.Identity;
+using Microsoft.Identity.Web;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
+
 builder.Services.AddCors();
+
+// Add Microsoft Identity Services
+builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
+
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(Directory.GetCurrentDirectory()) });
+var defaultFilesOptions = new DefaultFilesOptions { FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(Directory.GetCurrentDirectory()) };
+defaultFilesOptions.DefaultFileNames.Clear(); // Stop index.html from taking over
+app.UseDefaultFiles(defaultFilesOptions);
 app.UseStaticFiles(new StaticFileOptions { FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(Directory.GetCurrentDirectory()) });
+
+app.UseRouting();
 app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapGet("/", () => Results.Redirect("/login.html"));
+
+// --- Auth Endpoints ---
+app.MapGet("/login-microsoft", (HttpContext context) => {
+    return Results.Challenge(
+        properties: new AuthenticationProperties { RedirectUri = "/login.html?auth=success" },
+        authenticationSchemes: new[] { OpenIdConnectDefaults.AuthenticationScheme }
+    );
+});
+
+app.MapGet("/api/auth/user", (HttpContext context) => {
+    if (context.User.Identity?.IsAuthenticated == true) {
+        return Results.Ok(new { 
+            isAuthenticated = true, 
+            name = context.User.Identity.Name,
+            email = context.User.Claims.FirstOrDefault(c => c.Type == "preferred_username")?.Value 
+        });
+    }
+    return Results.Ok(new { isAuthenticated = false });
+});
+
+app.MapGet("/logout", async (HttpContext context) => {
+    await context.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme);
+    await context.SignOutAsync("Cookies");
+    return Results.Redirect("/login.html");
+});
 
 // --- Subscriber Endpoints (CSV) ---
 app.MapGet("/api/subscribers", async () => {
@@ -95,7 +138,25 @@ app.MapGet("/api/template", async () => {
 });
 
 // --- Send Email Endpoint ---
-app.MapPost("/api/send", async ([FromBody] SendSingleRequest request, IConfiguration config) => {
+app.MapPost("/api/send", async (HttpContext context, [FromBody] SendSingleRequest request, IConfiguration config) => {
+    // 1. Check Authentication
+    if (context.User.Identity?.IsAuthenticated != true) {
+        return Results.Unauthorized();
+    }
+
+    // 2. Check Authorization (Only Aakash and Rahul)
+    var userEmail = context.User.Claims.FirstOrDefault(c => c.Type == "preferred_username")?.Value?.ToLower();
+    var allowedEmails = new[] { "aakash.padyachi@orchvate.com", "rahul.rajesh@orchvate.com" };
+
+    if (userEmail == null || !allowedEmails.Contains(userEmail)) {
+        return Results.Forbid();
+    }
+
+    // 3. Safety Password Check
+    if (request.SafetyPassword != "ECHO12345") {
+        return Results.Problem("Invalid Safety Password.");
+    }
+
     if (!File.Exists("Newsletter_Wrapper.html"))
         return Results.Problem("Required email wrapper not found.");
 
@@ -134,13 +195,10 @@ app.MapPost("/api/send", async ([FromBody] SendSingleRequest request, IConfigura
     }
 
     // Extract MessageId if possible and log to DB
-    // Extract MessageId if possible and log to DB
-    if (result.GetType().Name.Contains("Ok")) {
-        // Use reflection to get MessageId from the anonymous object if needed, 
-        // but since we know the structure from SendViaACS/SendViaPowerAutomate:
+    if (result is Microsoft.AspNetCore.Http.HttpResults.Ok<object> okResult) {
+        // Since we know the structure from SendViaACS/SendViaPowerAutomate:
         try {
-            var valueProp = result.GetType().GetProperty("Value");
-            var val = valueProp?.GetValue(result);
+            var val = okResult.Value;
             msgId = val?.GetType().GetProperty("MessageId")?.GetValue(val) as string;
         } catch {}
         status = "Sent";
@@ -263,7 +321,9 @@ app.MapPost("/api/webhooks/acs", async (HttpContext context, IConfiguration conf
                 var status = data.GetProperty("status").GetString(); // Succeeded, Failed, etc.
                 
                 // Update our database
-                await UpdateLogStatus(config, messageId, status);
+                if (!string.IsNullOrEmpty(messageId) && !string.IsNullOrEmpty(status)) {
+                    await UpdateLogStatus(config, messageId, status);
+                }
                 Console.WriteLine($"Webhook: Updated {messageId} to {status}");
             }
         }
@@ -538,7 +598,7 @@ app.MapPost("/api/webhooks/eventgrid", async (HttpContext context, IConfiguratio
                 var messageId = data.GetProperty("messageId").GetString();
                 var status = data.GetProperty("status").GetString(); // Succeeded, Failed, etc.
                 
-                if (!string.IsNullOrEmpty(messageId)) {
+                if (!string.IsNullOrEmpty(messageId) && !string.IsNullOrEmpty(status)) {
                     await UpdateLogStatus(config, messageId, status);
                     Console.WriteLine($"[EventGrid] Updated {messageId} to {status}");
                 }
@@ -553,5 +613,5 @@ app.MapPost("/api/webhooks/eventgrid", async (HttpContext context, IConfiguratio
 
 app.Run();
 
-public record SendSingleRequest(string Email, string? Name, string? Subject, string? SenderType, string? Body, string? BatchId);
+public record SendSingleRequest(string Email, string? Name, string? Subject, string? SenderType, string? Body, string? BatchId, string? SafetyPassword);
 public record Subscriber(string Name, string Email);

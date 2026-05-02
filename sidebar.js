@@ -27,8 +27,14 @@ document.addEventListener('DOMContentLoaded', () => {
           <span>Queries</span>
         </a>
       </div>
-      <div class="sidebar-footer">
-        <img src="https://mcusercontent.com/201e76b8f447ee4c8b7fbe53e/images/c2e0273b-0dab-d392-fe35-965293bee40c.png" alt="Orchvate Logo">
+      <div class="sidebar-footer-group">
+        <a href="/logout" id="nav-logout" class="logout-link" onclick="sessionStorage.clear()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          <span>Logout</span>
+        </a>
+        <div class="sidebar-footer">
+          <img src="https://mcusercontent.com/201e76b8f447ee4c8b7fbe53e/images/c2e0273b-0dab-d392-fe35-965293bee40c.png" alt="Orchvate Logo">
+        </div>
       </div>
     </nav>
     `;

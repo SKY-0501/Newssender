@@ -1,3 +1,17 @@
+# EchoMail Production Guide
+
+## 🔐 Security & Safety Protocol
+This application is secured using Microsoft Identity and role-based access.
+
+*   **Authorized Senders:** 
+    *   `aakash.padyachi@orchvate.com`
+    *   `rahul.rajesh@orchvate.com`
+*   **Safety Blast Password:** `ECHO12345`
+    *   *Note: This password is required in the custom popup before any newsletter blast can be initiated.*
+*   **Session Memory:** Authentication status is cached in `sessionStorage` for fast page transitions. Clearing your browser cache or logging out will reset this.
+
+---
+
 # Orchvate Analytics Dashboard: Engineering Blueprint
 
 This document serves as the master engineering blueprint for building the **Orchvate Analytics Dashboard**. It details the complete architecture, data schemas, and query logic required to unify both **Frontend Behavioral Telemetry** and **Backend Database Records** into a single, cohesive visualization platform.
