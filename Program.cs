@@ -134,9 +134,15 @@ app.MapPost("/api/send", async ([FromBody] SendSingleRequest request, IConfigura
     }
 
     // Extract MessageId if possible and log to DB
-    if (result is Microsoft.AspNetCore.Http.HttpResults.Ok<object> okResult) {
-        var data = okResult.Value as dynamic;
-        msgId = data?.MessageId;
+    // Extract MessageId if possible and log to DB
+    if (result.GetType().Name.Contains("Ok")) {
+        // Use reflection to get MessageId from the anonymous object if needed, 
+        // but since we know the structure from SendViaACS/SendViaPowerAutomate:
+        try {
+            var valueProp = result.GetType().GetProperty("Value");
+            var val = valueProp?.GetValue(result);
+            msgId = val?.GetType().GetProperty("MessageId")?.GetValue(val) as string;
+        } catch {}
         status = "Sent";
     } else {
         status = "Failed";
@@ -510,7 +516,6 @@ app.MapGet("/api/analytics/exceptions", (IConfiguration config) =>
 app.MapPost("/api/webhooks/eventgrid", async (HttpContext context, IConfiguration config) => {
     using var reader = new StreamReader(context.Request.Body);
     var body = await reader.ReadToEndAsync();
-    Console.WriteLine("Received EventGrid Event: " + body);
     
     // Azure Event Grid Validation Handshake
     if (context.Request.Headers["aeg-event-type"].FirstOrDefault() == "SubscriptionValidation") {
@@ -523,7 +528,26 @@ app.MapPost("/api/webhooks/eventgrid", async (HttpContext context, IConfiguratio
         }
     }
 
-    // Process actual delivery reports here (Update database to 'Delivered' / 'Bounced')
+    // Process actual delivery reports
+    try {
+        var events = System.Text.Json.JsonDocument.Parse(body);
+        foreach (var element in events.RootElement.EnumerateArray()) {
+            var eventType = element.GetProperty("eventType").GetString();
+            if (eventType == "Microsoft.Communication.EmailDeliveryReportReceived") {
+                var data = element.GetProperty("data");
+                var messageId = data.GetProperty("messageId").GetString();
+                var status = data.GetProperty("status").GetString(); // Succeeded, Failed, etc.
+                
+                if (!string.IsNullOrEmpty(messageId)) {
+                    await UpdateLogStatus(config, messageId, status);
+                    Console.WriteLine($"[EventGrid] Updated {messageId} to {status}");
+                }
+            }
+        }
+    } catch (Exception ex) {
+        Console.WriteLine("[EventGrid] Error: " + ex.Message);
+    }
+
     return Results.Ok();
 });
 
