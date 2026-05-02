@@ -567,23 +567,163 @@ app.MapGet("/api/analytics/kql-kpis", async (IConfiguration config) => {
         return Results.Ok(new { avgActiveTime = 0, mobilePercentage = 0, error = "pending" });
     try {
         var client = new LogsQueryClient(new DefaultAzureCredential());
-        var query = "customEvents | where name == 'TimeOnPage' | extend ActiveSeconds = toint(customDimensions.activeTimeSeconds) | summarize avg(ActiveSeconds)";
-        var result = await client.QueryWorkspaceAsync<double>(workspaceId, query, new QueryTimeRange(TimeSpan.FromDays(30)));
-        return Results.Ok(new { avgActiveTime = Math.Round(result.Value.FirstOrDefault(), 1), mobilePercentage = 68.2 });
+        var query = "AppEvents | where Name == 'TimeOnPage' | extend ActiveSeconds = toint(Properties.activeTimeSeconds) | summarize avg(ActiveSeconds)";
+        var val = result.Value.FirstOrDefault();
+        if (double.IsNaN(val) || double.IsInfinity(val)) val = 0;
+        return Results.Ok(new { avgActiveTime = Math.Round(val, 1), mobilePercentage = 68.2 });
     } catch (Exception ex) {
         Console.WriteLine($"KQL Error in KPIs: {ex.Message}");
         return Results.Ok(new { avgActiveTime = 0, mobilePercentage = 0, error = ex.Message });
     }
 });
 
-app.MapGet("/api/analytics/latency", (IConfiguration config) =>
-    Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" }));
+app.MapGet("/api/analytics/latency", async (IConfiguration config) => {
+    var workspaceId = config["AppInsights:WorkspaceId"];
+    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
+    try {
+        var client = new LogsQueryClient(new DefaultAzureCredential());
+        var query = "AppEvents | where Name == 'ApiLatency' | extend DurationMs = toint(Properties.durationMs) | summarize AverageWaitTimeMs = avg(DurationMs) by bin(TimeGenerated, 1h) | order by TimeGenerated asc";
+        var result = await client.QueryWorkspaceAsync(workspaceId, query, new QueryTimeRange(TimeSpan.FromDays(7)));
+        var table = result.Value.AllTables.FirstOrDefault();
+        var labels = new List<string>();
+        var values = new List<double>();
+        if (table != null) {
+            foreach (var row in table.Rows) {
+                labels.Add(row.GetDateTimeOffset(0)?.ToString("HH:mm") ?? "00:00");
+                var val = row.GetDouble(1) ?? 0.0;
+                if (double.IsNaN(val) || double.IsInfinity(val)) val = 0.0;
+                values.Add(val);
+            }
+        }
+        return Results.Ok(new { labels, values });
+    } catch (Exception ex) { return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = ex.Message }); }
+});
 
-app.MapGet("/api/analytics/scroll", (IConfiguration config) =>
-    Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" }));
+app.MapGet("/api/analytics/scroll", async (IConfiguration config) => {
+    var workspaceId = config["AppInsights:WorkspaceId"];
+    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
+    try {
+        var client = new LogsQueryClient(new DefaultAzureCredential());
+        var query = "AppEvents | where Name == 'ScrollDepth' | summarize ReachedCount = count() by depth = tostring(Properties.depth) | order by depth asc";
+        var result = await client.QueryWorkspaceAsync(workspaceId, query, new QueryTimeRange(TimeSpan.FromDays(30)));
+        var table = result.Value.AllTables.FirstOrDefault();
+        var labels = new List<string>();
+        var values = new List<long>();
+        if (table != null) {
+            foreach (var row in table.Rows) {
+                labels.Add(row.GetString(0) ?? "0%");
+                values.Add(row.GetInt64(1) ?? 0);
+            }
+        }
+        return Results.Ok(new { labels, values });
+    } catch (Exception ex) { return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = ex.Message }); }
+});
 
-app.MapGet("/api/analytics/exceptions", (IConfiguration config) =>
-    Results.Ok(Array.Empty<object>()));
+app.MapGet("/api/analytics/exceptions", async (IConfiguration config) => {
+    var workspaceId = config["AppInsights:WorkspaceId"];
+    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(Array.Empty<object>());
+    try {
+        var client = new LogsQueryClient(new DefaultAzureCredential());
+        var query = "AppExceptions | project TimeGenerated, Type, Message, url = tostring(Properties.url) | order by TimeGenerated desc | take 20";
+        var result = await client.QueryWorkspaceAsync(workspaceId, query, new QueryTimeRange(TimeSpan.FromDays(30)));
+        var table = result.Value.AllTables.FirstOrDefault();
+        var list = new List<object>();
+        if (table != null) {
+            foreach (var row in table.Rows) {
+                list.Add(new {
+                    timestamp = row.GetDateTimeOffset(0),
+                    type = row.GetString(1),
+                    message = row.GetString(2),
+                    url = row.GetString(3)
+                });
+            }
+        }
+        return Results.Ok(list);
+    } catch { return Results.Ok(Array.Empty<object>()); }
+});
+
+app.MapGet("/api/analytics/pages", async (IConfiguration config) => {
+    var workspaceId = config["AppInsights:WorkspaceId"];
+    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
+    try {
+        var client = new LogsQueryClient(new DefaultAzureCredential());
+        var query = "AppPageViews | summarize count() by Url | order by count_ desc | take 10";
+        var result = await client.QueryWorkspaceAsync(workspaceId, query, new QueryTimeRange(TimeSpan.FromDays(30)));
+        var table = result.Value.AllTables.FirstOrDefault();
+        var labels = new List<string>();
+        var values = new List<long>();
+        if (table != null) {
+            foreach (var row in table.Rows) {
+                labels.Add(row.GetString(0) ?? "Unknown");
+                values.Add(row.GetInt64(1) ?? 0);
+            }
+        }
+        return Results.Ok(new { labels, values });
+    } catch (Exception ex) { return Results.Ok(new { error = ex.Message }); }
+});
+
+app.MapGet("/api/analytics/geo", async (IConfiguration config) => {
+    var workspaceId = config["AppInsights:WorkspaceId"];
+    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
+    try {
+        var client = new LogsQueryClient(new DefaultAzureCredential());
+        var query = "AppPageViews | summarize count() by ClientCountryOrRegion | order by count_ desc | take 10";
+        var result = await client.QueryWorkspaceAsync(workspaceId, query, new QueryTimeRange(TimeSpan.FromDays(30)));
+        var table = result.Value.AllTables.FirstOrDefault();
+        var labels = new List<string>();
+        var values = new List<long>();
+        if (table != null) {
+            foreach (var row in table.Rows) {
+                labels.Add(row.GetString(0) ?? "Unknown");
+                values.Add(row.GetInt64(1) ?? 0);
+            }
+        }
+        return Results.Ok(new { labels, values });
+    } catch (Exception ex) { return Results.Ok(new { error = ex.Message }); }
+});
+
+app.MapGet("/api/analytics/browsers", async (IConfiguration config) => {
+    var workspaceId = config["AppInsights:WorkspaceId"];
+    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
+    try {
+        var client = new LogsQueryClient(new DefaultAzureCredential());
+        var query = "AppPageViews | summarize count() by ClientBrowser | order by count_ desc | take 5";
+        var result = await client.QueryWorkspaceAsync(workspaceId, query, new QueryTimeRange(TimeSpan.FromDays(30)));
+        var table = result.Value.AllTables.FirstOrDefault();
+        var labels = new List<string>();
+        var values = new List<long>();
+        if (table != null) {
+            foreach (var row in table.Rows) {
+                labels.Add(row.GetString(0) ?? "Unknown");
+                values.Add(row.GetInt64(1) ?? 0);
+            }
+        }
+        return Results.Ok(new { labels, values });
+    } catch (Exception ex) { return Results.Ok(new { error = ex.Message }); }
+});
+
+app.MapGet("/api/analytics/performance", async (IConfiguration config) => {
+    var workspaceId = config["AppInsights:WorkspaceId"];
+    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(new { pageLoad = 0, domContent = 0, error = "pending" });
+    try {
+        var client = new LogsQueryClient(new DefaultAzureCredential());
+        var query = "AppEvents | where Name == 'PageLoadMetrics' | summarize avgPageLoad = avg(toint(Properties.pageLoadTime)), avgDomContent = avg(toint(Properties.domContentLoaded))";
+        var result = await client.QueryWorkspaceAsync(workspaceId, query, new QueryTimeRange(TimeSpan.FromDays(30)));
+        var table = result.Value.AllTables.FirstOrDefault();
+        if (table != null && table.Rows.Count > 0) {
+            var row = table.Rows[0];
+            var pLoad = row.GetDouble(0) ?? 0.0;
+            var dContent = row.GetDouble(1) ?? 0.0;
+            if (double.IsNaN(pLoad) || double.IsInfinity(pLoad)) pLoad = 0;
+            if (double.IsNaN(dContent) || double.IsInfinity(dContent)) dContent = 0;
+            return Results.Ok(new { 
+                pageLoad = Math.Round(pLoad, 0), 
+                domContent = Math.Round(dContent, 0) 
+            });
+        }
+        return Results.Ok(new { pageLoad = 0, domContent = 0 });
+    } catch (Exception ex) { return Results.Ok(new { error = ex.Message }); }
+});
 
 // --- Azure Event Grid Webhook Endpoint (Email Confirmations) ---
 app.MapPost("/api/webhooks/eventgrid", async (HttpContext context, IConfiguration config) => {
