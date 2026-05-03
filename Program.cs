@@ -14,6 +14,23 @@ using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load .env file manually if it exists
+if (File.Exists(".env"))
+{
+    foreach (var line in File.ReadAllLines(".env"))
+    {
+        var parts = line.Split('=', 2);
+        if (parts.Length == 2)
+        {
+            var key = parts[0].Trim();
+            var value = parts[1].Trim().Trim('"');
+            Environment.SetEnvironmentVariable(key, value);
+        }
+    }
+    // Re-build configuration to include the new env vars
+    builder.Configuration.AddEnvironmentVariables();
+}
+
 builder.Services.AddCors();
 
 // Add Microsoft Identity Services
