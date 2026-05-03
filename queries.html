@@ -26,18 +26,9 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --primary:     #FF2D2D;
-            --bg:          #111111;
-            --surface:     #161616;
-            --border:      #333333;
-            --text:        #FFFFFF;
-            --text-sub:    #bbbbbb;
-            --accent:      #FF2D2D;
-        }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-        body { background-color: var(--bg); color: var(--text); display: flex; min-height: 100vh; overflow-x: hidden; }
+        body { background-color: var(--bg); color: var(--text); display: flex; min-height: 100vh; overflow-x: hidden; transition: background-color 0.3s, color 0.3s; }
 
         /* Film Grain Overlay */
         body::before {
@@ -51,39 +42,44 @@
 
         /* WIDGET / TABLE AREA */
         .widget {
-            background: #111;
-            border: 1px dashed #333;
+            background: var(--surface);
+            border: 1px dashed var(--border);
             padding: 40px;
             position: relative;
             border-radius: 4px;
         }
         .widget::before, .widget::after {
-            content: "○"; position: absolute; font-size: 10px; color: #444;
+            content: "○"; position: absolute; font-size: 10px; color: var(--text-faint);
         }
         .widget::before { top: 10px; left: 10px; }
         .widget::after { top: 10px; right: 10px; }
 
         .search-bar {
             margin-bottom: 32px;
-            background: #161616;
-            border: 1.5px solid #222;
+            background: var(--bg);
+            border: 1.5px solid var(--border);
             border-radius: 100px;
             padding: 14px 24px;
             width: 100%;
             max-width: 400px;
-            color: #fff;
+            color: var(--text);
             outline: none;
             font-size: 14px;
         }
         .search-bar:focus { border-color: var(--primary); }
 
-        .data-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .data-table th, .data-table td { padding: 16px; text-align: left; border-bottom: 1px solid #222; }
+        .data-table { width: 100%; border-spacing: 0; border-collapse: separate; margin-top: 20px; }
+        .data-table th, .data-table td { 
+            padding: 20px 16px; 
+            text-align: left; 
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
         .data-table th { 
-            font-weight: 900; color: #000; background: #e8e8e4; 
+            font-weight: 900; color: var(--text); background: var(--table-header); 
             font-size: 10px; text-transform: uppercase; letter-spacing: 2px;
         }
-        .data-table td { color: #fff; font-size: 14px; font-weight: 600; vertical-align: top; }
+        .data-table td { color: var(--text); font-size: 14px; font-weight: 600; line-height: 1.5; }
         .data-table td .topic { color: var(--primary); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 900; display: block; margin-bottom: 4px; }
         .data-table td .msg { color: #888; font-weight: 400; font-size: 13px; line-height: 1.5; display: block; max-width: 400px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .data-table tbody tr { cursor: pointer; transition: background-color 0.2s; }
@@ -105,9 +101,9 @@
             justify-content: center;
         }
         .modal-content {
-            background-color: #111;
+            background-color: var(--surface);
             padding: 40px;
-            border: 1px dashed #333;
+            border: 1px dashed var(--border);
             width: 90%;
             max-width: 600px;
             border-radius: 4px;
@@ -117,7 +113,7 @@
             content: '○';
             position: absolute;
             font-size: 10px;
-            color: #444;
+            color: var(--text-faint);
         }
         .modal-content::before { top: 10px; left: 10px; }
         .modal-content::after { top: 10px; right: 10px; }
@@ -131,9 +127,9 @@
             transition: color 0.2s;
         }
         .close:hover { color: #fff; }
-        .modal-topic { font-size: 11px; font-weight: 900; color: #FF2D2D; letter-spacing: 2px; margin-bottom: 12px; text-transform: uppercase; }
-        .modal-sender { font-size: 14px; color: #888; margin-bottom: 30px; font-weight: 600; }
-        .modal-text { font-size: 16px; color: #fff; line-height: 1.6; white-space: pre-wrap; font-weight: 400; }
+        .modal-topic { font-size: 11px; font-weight: 900; color: var(--primary); letter-spacing: 2px; margin-bottom: 12px; text-transform: uppercase; }
+        .modal-sender { font-size: 14px; color: var(--text-sub); margin-bottom: 30px; font-weight: 600; }
+        .modal-text { font-size: 16px; color: var(--text); line-height: 1.6; white-space: pre-wrap; font-weight: 400; }
 
         .loading { text-align: center; padding: 40px; color: #555; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
 
@@ -153,7 +149,7 @@
 
     <main class="main-content">
         <div class="header">
-            <h1>Q<span style="color:#e7e7e3">U</span>ERIES</h1>
+            <h1>Q<span style="color:var(--highlight)">U</span>ERIES</h1>
             <p>Manage incoming inquiries and messages from the website contact forms.</p>
         </div>
         <style>

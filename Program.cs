@@ -580,7 +580,7 @@ app.MapGet("/api/analytics/recent-inquiries", async (IConfiguration config) => {
 // --- App Insights / KQL Endpoints (graceful pending state) ---
 app.MapGet("/api/analytics/kql-kpis", async (IConfiguration config) => {
     var workspaceId = config["AppInsights:WorkspaceId"];
-    if (string.IsNullOrEmpty(workspaceId) || workspaceId.Contains("your_log_analytics"))
+    if (string.IsNullOrEmpty(workspaceId) || workspaceId.Contains("YOUR_") || workspaceId.Contains("your_"))
         return Results.Ok(new { avgActiveTime = 0, mobilePercentage = 0, error = "pending" });
     try {
         var client = new LogsQueryClient(new DefaultAzureCredential());
@@ -598,7 +598,8 @@ app.MapGet("/api/analytics/kql-kpis", async (IConfiguration config) => {
 
 app.MapGet("/api/analytics/latency", async (IConfiguration config) => {
     var workspaceId = config["AppInsights:WorkspaceId"];
-    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
+    if (string.IsNullOrEmpty(workspaceId) || workspaceId.Contains("YOUR_") || workspaceId.Contains("your_")) 
+        return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
     try {
         var client = new LogsQueryClient(new DefaultAzureCredential());
         var query = "AppEvents | where Name == 'ApiLatency' | extend DurationMs = toint(Properties.durationMs) | summarize AverageWaitTimeMs = avg(DurationMs) by bin(TimeGenerated, 1h) | order by TimeGenerated asc";
@@ -620,7 +621,8 @@ app.MapGet("/api/analytics/latency", async (IConfiguration config) => {
 
 app.MapGet("/api/analytics/scroll", async (IConfiguration config) => {
     var workspaceId = config["AppInsights:WorkspaceId"];
-    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
+    if (string.IsNullOrEmpty(workspaceId) || workspaceId.Contains("YOUR_") || workspaceId.Contains("your_")) 
+        return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
     try {
         var client = new LogsQueryClient(new DefaultAzureCredential());
         var query = "AppEvents | where Name == 'ScrollDepth' | summarize ReachedCount = count() by depth = tostring(Properties.depth) | order by depth asc";
@@ -640,7 +642,8 @@ app.MapGet("/api/analytics/scroll", async (IConfiguration config) => {
 
 app.MapGet("/api/analytics/exceptions", async (IConfiguration config) => {
     var workspaceId = config["AppInsights:WorkspaceId"];
-    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(Array.Empty<object>());
+    if (string.IsNullOrEmpty(workspaceId) || workspaceId.Contains("YOUR_") || workspaceId.Contains("your_")) 
+        return Results.Ok(Array.Empty<object>());
     try {
         var client = new LogsQueryClient(new DefaultAzureCredential());
         var query = "AppExceptions | project TimeGenerated, Type, Message, url = tostring(Properties.url) | order by TimeGenerated desc | take 20";
@@ -663,7 +666,8 @@ app.MapGet("/api/analytics/exceptions", async (IConfiguration config) => {
 
 app.MapGet("/api/analytics/pages", async (IConfiguration config) => {
     var workspaceId = config["AppInsights:WorkspaceId"];
-    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
+    if (string.IsNullOrEmpty(workspaceId) || workspaceId.Contains("YOUR_") || workspaceId.Contains("your_")) 
+        return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
     try {
         var client = new LogsQueryClient(new DefaultAzureCredential());
         var query = "AppPageViews | summarize count() by Url | order by count_ desc | take 10";
@@ -683,7 +687,8 @@ app.MapGet("/api/analytics/pages", async (IConfiguration config) => {
 
 app.MapGet("/api/analytics/geo", async (IConfiguration config) => {
     var workspaceId = config["AppInsights:WorkspaceId"];
-    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
+    if (string.IsNullOrEmpty(workspaceId) || workspaceId.Contains("YOUR_") || workspaceId.Contains("your_")) 
+        return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
     try {
         var client = new LogsQueryClient(new DefaultAzureCredential());
         var query = "AppPageViews | summarize count() by ClientCountryOrRegion | order by count_ desc | take 10";
@@ -703,7 +708,8 @@ app.MapGet("/api/analytics/geo", async (IConfiguration config) => {
 
 app.MapGet("/api/analytics/browsers", async (IConfiguration config) => {
     var workspaceId = config["AppInsights:WorkspaceId"];
-    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
+    if (string.IsNullOrEmpty(workspaceId) || workspaceId.Contains("YOUR_") || workspaceId.Contains("your_")) 
+        return Results.Ok(new { labels = Array.Empty<string>(), values = Array.Empty<int>(), error = "pending" });
     try {
         var client = new LogsQueryClient(new DefaultAzureCredential());
         var query = "AppPageViews | summarize count() by ClientBrowser | order by count_ desc | take 5";
@@ -723,7 +729,8 @@ app.MapGet("/api/analytics/browsers", async (IConfiguration config) => {
 
 app.MapGet("/api/analytics/performance", async (IConfiguration config) => {
     var workspaceId = config["AppInsights:WorkspaceId"];
-    if (string.IsNullOrEmpty(workspaceId)) return Results.Ok(new { pageLoad = 0, domContent = 0, error = "pending" });
+    if (string.IsNullOrEmpty(workspaceId) || workspaceId.Contains("YOUR_") || workspaceId.Contains("your_")) 
+        return Results.Ok(new { pageLoad = 0, domContent = 0, error = "pending" });
     try {
         var client = new LogsQueryClient(new DefaultAzureCredential());
         var query = "AppEvents | where Name == 'PageLoadMetrics' | summarize avgPageLoad = avg(toint(Properties.pageLoadTime)), avgDomContent = avg(toint(Properties.domContentLoaded))";

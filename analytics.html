@@ -28,17 +28,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <style>
-        :root {
-            --primary:    #FF2D2D;
-            --secondary:  #FF2D2D;
-            --bg:         #111111;
-            --surface:    #161616;
-            --border:     #333333;
-            --text:       #FFFFFF;
-            --text-sub:   #999999;
-            --text-faint: #444444;
-            --accent:     #FF2D2D;
-        }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
         body {
@@ -47,6 +36,7 @@
             color: var(--text);
             display: flex;
             position: relative;
+            transition: background-color 0.3s, color 0.3s;
         }
         body::before {
             content: "";
@@ -68,19 +58,23 @@
 
         /* CARDS — transparent paper feel */
         .widget {
-            background: #111111;
-            border: 1px dashed #333333;
+            background: var(--surface);
+            border: 1px dashed var(--border);
             border-radius: 4px;
             padding: 24px;
-            transition: all 0.2s;
+            /* Animation: translateY only — no shadow to avoid phantom card artifact */
+            transition: transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
             position: relative;
             overflow: hidden;
+        }
+        .widget:hover {
+            transform: translateY(-2px);
         }
         .widget::before, .widget::after {
             content: '○';
             position: absolute;
             font-size: 10px;
-            color: #444;
+            color: var(--text-faint);
         }
         .widget::before { top: 10px; left: 10px; }
         .widget::after { top: 10px; right: 10px; }
@@ -131,14 +125,14 @@
         .kpi-value {
             font-size: 48px;
             font-weight: 900;
-            color: #FFFFFF;
+            color: var(--text);
             margin: 5px 0;
             letter-spacing: -1.5px;
         }
         .kpi-sub {
             font-size: 13px;
             font-weight: 600;
-            color: #bbbbbb;
+            color: var(--text-sub);
         }
 
         /* Charts Container */
@@ -154,32 +148,33 @@
             overflow-y: auto;
             font-family: 'Courier New', monospace;
             font-size: 12px;
-            background: #ffffff;
-            color: #0a0a0a;
+            background: var(--bg);
+            color: var(--text);
             padding: 15px;
             border-radius: 12px;
             border: 1.5px solid var(--border);
         }
         .exception-feed li {
             margin-bottom: 8px;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid var(--border);
             padding-bottom: 5px;
         }
 
         .loading-overlay {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(247,247,239,0.8);
+            background: var(--surface);
+            opacity: 0.8;
             display: flex;
             justify-content: center;
             align-items: center;
             z-index: 10;
-            border-radius: 20px;
+            border-radius: 4px;
         }
         .spinner {
             width: 24px; height: 24px;
-            border: 3px solid #e0e0dc;
-            border-top-color: #0a0a0a;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -212,8 +207,15 @@
             text-transform: uppercase;
             letter-spacing: 1.5px;
         }
+        /* Animation: row hover slide-right — Delight per handbook §3.3 */
+        .data-table tbody tr {
+            transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
         .data-table tr:hover td {
             background: rgba(0,0,0,0.02);
+        }
+        .data-table tbody tr:hover {
+            transform: translateX(3px);
         }
         .badge {
             padding: 4px 8px;
@@ -236,7 +238,7 @@
 
         /* SHIMMER SKELETON */
         .skeleton {
-            background: linear-gradient(90deg, #161616 25%, #1d1d1d 50%, #161616 75%);
+            background: linear-gradient(90deg, var(--surface) 25%, var(--border) 50%, var(--surface) 75%);
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite;
             border-radius: 4px;
@@ -249,6 +251,27 @@
         .skeleton-chart { height: 200px; width: 100%; }
 
         /* REVEAL ANIMATION Handled by GSAP */
+
+        /* KPI value pop — State Transition: signals data has loaded (handbook §10 Step 4) */
+        @keyframes kpiPop {
+          0%   { transform: scale(1);    }
+          40%  { transform: scale(1.06); }
+          100% { transform: scale(1);    }
+        }
+        .kpi-pop {
+          animation: kpiPop 350ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        /* ── Accessibility: prefers-reduced-motion (handbook §8.4) ─────────── */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration:        0.01ms !important;
+                animation-iteration-count: 1      !important;
+                transition-duration:       0.01ms !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -413,27 +436,34 @@
     </div>
 
     <script>
+        const isLight = document.documentElement.classList.contains('light-mode');
+        
         // Chart Config Defaults
         Chart.defaults.font.family = "'Inter', sans-serif";
-        Chart.defaults.color = '#FFFFFF';
-        Chart.defaults.plugins.legend.labels.color = '#FFFFFF';
-        Chart.defaults.plugins.tooltip.backgroundColor = '#1a1a1a';
+        Chart.defaults.color = isLight ? '#1D1D1F' : '#FFFFFF';
+        Chart.defaults.plugins.legend.labels.color = isLight ? '#1D1D1F' : '#FFFFFF';
+        Chart.defaults.plugins.tooltip.backgroundColor = isLight ? '#FFFFFF' : '#1a1a1a';
+        Chart.defaults.plugins.tooltip.titleColor = isLight ? '#000000' : '#FFFFFF';
+        Chart.defaults.plugins.tooltip.bodyColor = isLight ? '#000000' : '#FFFFFF';
         
         // Scale Defaults
-        Chart.defaults.scales.category.grid = { color: 'rgba(255, 255, 255, 0.1)' };
-        Chart.defaults.scales.linear.grid = { color: 'rgba(255, 255, 255, 0.1)' };
-        Chart.defaults.scales.category.ticks = { color: '#bbbbbb' };
-        Chart.defaults.scales.linear.ticks = { color: '#bbbbbb' };
+        Chart.defaults.scales.category.grid = { color: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.1)' };
+        Chart.defaults.scales.linear.grid = { color: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.1)' };
+        Chart.defaults.scales.category.ticks = { color: isLight ? '#86868B' : '#bbbbbb' };
+        Chart.defaults.scales.linear.ticks = { color: isLight ? '#86868B' : '#bbbbbb' };
         
         const colors = {
-            primary: '#FFFFFF',
+            primary: isLight ? '#1D1D1F' : '#FFFFFF',
             secondary: '#FF2D2D',
-            accent1: '#FFFFFF',
-            accent2: '#bbbbbb',
-            accent3: '#333333',
+            accent1: isLight ? '#86868B' : '#FFFFFF',
+            accent2: isLight ? '#C1C1C6' : '#bbbbbb',
+            accent3: isLight ? '#F5F5F7' : '#333333',
             bgPrimary: 'rgba(255, 45, 45, 0.1)',
-            bgSecondary: 'rgba(255, 255, 255, 0.05)'
+            bgSecondary: isLight ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.05)'
         };
+
+        // Listen for theme changes and reload to refresh charts
+        window.addEventListener('themeChanged', () => location.reload());
 
         // Utility: Fetch and remove spinner
         async function fetchWidgetData(endpoint, widgetId) {
@@ -471,6 +501,13 @@
                         minimumFractionDigits: decimals,
                         maximumFractionDigits: decimals
                     }) + suffix;
+                },
+                onComplete: () => {
+                    /* Animation: pop scale on finish — State Transition: data loaded */
+                    el.classList.remove('kpi-pop');
+                    void el.offsetWidth; // force reflow so re-adding the class triggers animation
+                    el.classList.add('kpi-pop');
+                    el.addEventListener('animationend', () => el.classList.remove('kpi-pop'), { once: true });
                 }
             });
         }
@@ -500,189 +537,187 @@
         }
 
         async function initDashboard() {
-            // Split title for staggered entrance
-            const title = document.getElementById('main-title');
-            const text = title.innerText;
-            title.innerHTML = text.split('').map((char, i) => `<span class="letter" style="display:inline-block; color:${char === 'N' ? '#e7e7e3' : 'inherit'}">${char}</span>`).join('');
-
-            // Overall Page Landing Animation
-            const tl = gsap.timeline();
-            tl.from(".header p", { opacity: 0, y: 10, duration: 1 })
-              .from(".letter", { 
-                  opacity: 0, 
-                  y: 50, 
-                  rotationX: -90, 
-                  stagger: 0.05, 
-                  duration: 0.8, 
-                  ease: "back.out(1.7)" 
-              }, "-=1")
-              .from(".widget", {
-                  y: 30,
-                  opacity: 0,
-                  duration: 0.6,
-                  stagger: 0.04,
-                  ease: "power2.out",
-                  clearProps: "all"
-              }, "-=0.5");
-
             // TIER 1: KPIs (SQL based)
-            const kpis = await fetchWidgetData('/api/analytics/kpis', 'w1-subscribers');
-            if (kpis && kpis.totalVerified !== undefined) {
-                animateNumber('val-subscribers', kpis.totalVerified);
-                animateNumber('val-crosspoll', kpis.crossPollinationRate || 0, '%', 1);
-            }
-            document.querySelector('#w2-crosspoll .loading-overlay').style.display = 'none';
+            fetchWidgetData('/api/analytics/kpis', 'w1-subscribers').then(kpis => {
+                if (kpis && kpis.totalVerified !== undefined) {
+                    animateNumber('val-subscribers', kpis.totalVerified);
+                    animateNumber('val-crosspoll', kpis.crossPollinationRate || 0, '%', 1);
+                }
+                const crossOverlay = document.querySelector('#w2-crosspoll .loading-overlay');
+                if (crossOverlay) crossOverlay.style.display = 'none';
+            });
             
             // KQL Based KPIs
-            const kqlKpis = await fetchWidgetData('/api/analytics/kql-kpis', 'w3-activetime');
-            if (kqlKpis && kqlKpis.avgActiveTime !== undefined) {
-                animateNumber('val-activetime', kqlKpis.avgActiveTime, 's', 1);
-                animateNumber('val-mobile', kqlKpis.mobilePercentage || 0, '%', 1);
-            } else {
-                document.getElementById('val-activetime').innerText = '0s';
-                document.getElementById('val-mobile').innerText = '0.0%';
-            }
-            document.querySelector('#w4-mobile .loading-overlay').style.display = 'none';
-
+            fetchWidgetData('/api/analytics/kql-kpis', 'w3-activetime').then(kqlKpis => {
+                if (kqlKpis && kqlKpis.avgActiveTime !== undefined) {
+                    animateNumber('val-activetime', kqlKpis.avgActiveTime, 's', 1);
+                    animateNumber('val-mobile', kqlKpis.mobilePercentage || 0, '%', 1);
+                } else {
+                    const at = document.getElementById('val-activetime');
+                    const mb = document.getElementById('val-mobile');
+                    if (at) at.innerText = '0s';
+                    if (mb) mb.innerText = '0.0%';
+                }
+                const mobileOverlay = document.querySelector('#w4-mobile .loading-overlay');
+                if (mobileOverlay) mobileOverlay.style.display = 'none';
+            });
+            
             // Frontend Performance
-            const perf = await fetchWidgetData('/api/analytics/performance', 'w-perf-load');
-            if (perf && perf.pageLoad !== undefined) {
-                animateNumber('val-page-load', perf.pageLoad, 'ms');
-                animateNumber('val-dom-content', perf.domContent, 'ms');
-            } else {
-                document.getElementById('val-page-load').innerText = '0ms';
-                document.getElementById('val-dom-content').innerText = '0ms';
-            }
-            document.querySelector('#w-perf-dom .loading-overlay').style.display = 'none';
+            fetchWidgetData('/api/analytics/performance', 'w-perf-load').then(perf => {
+                if (perf && perf.pageLoad !== undefined) {
+                    animateNumber('val-page-load', perf.pageLoad, 'ms');
+                    animateNumber('val-dom-content', perf.domContent, 'ms');
+                } else {
+                    const pl = document.getElementById('val-page-load');
+                    const dc = document.getElementById('val-dom-content');
+                    if (pl) pl.innerText = '0ms';
+                    if (dc) dc.innerText = '0ms';
+                }
+                const domOverlay = document.querySelector('#w-perf-dom .loading-overlay');
+                if (domOverlay) domOverlay.style.display = 'none';
+            });
 
             // Geo Distribution
-            const geoData = await fetchWidgetData('/api/analytics/geo', 'w-geo-dist');
-            if (geoData && geoData.labels && geoData.labels.length > 0) {
-                animateText('val-top-geo', geoData.labels[0].toUpperCase());
-                new Chart(document.getElementById('chart-geo'), {
-                    type: 'bar',
-                    data: {
-                        labels: geoData.labels,
-                        datasets: [{ label: 'Users', data: geoData.values, backgroundColor: colors.secondary, borderRadius: 4 }]
-                    },
-                    options: { maintainAspectRatio: false, indexAxis: 'y' }
-                });
-            } else {
-                document.getElementById('val-top-geo').innerText = 'N/A';
-            }
-            document.querySelector('#w-geo-top .loading-overlay').style.display = 'none';
+            fetchWidgetData('/api/analytics/geo', 'w-geo-dist').then(geoData => {
+                if (geoData && geoData.labels && geoData.labels.length > 0) {
+                    animateText('val-top-geo', geoData.labels[0].toUpperCase());
+                    new Chart(document.getElementById('chart-geo'), {
+                        type: 'bar',
+                        data: {
+                            labels: geoData.labels,
+                            datasets: [{ label: 'Users', data: geoData.values, backgroundColor: colors.secondary, borderRadius: 4 }]
+                        },
+                        options: { maintainAspectRatio: false, indexAxis: 'y' }
+                    });
+                } else {
+                    const geoVal = document.getElementById('val-top-geo');
+                    if (geoVal) geoVal.innerText = 'N/A';
+                }
+                const geoTopOverlay = document.querySelector('#w-geo-top .loading-overlay');
+                if (geoTopOverlay) geoTopOverlay.style.display = 'none';
+            });
 
             // Browser Distribution
-            const browserData = await fetchWidgetData('/api/analytics/browsers', 'w-browser-dist');
-            if (browserData && browserData.labels && browserData.labels.length > 0) {
-                animateText('val-top-browser', browserData.labels[0].toUpperCase());
-                new Chart(document.getElementById('chart-browsers'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: browserData.labels,
-                        datasets: [{ data: browserData.values, backgroundColor: [colors.primary, colors.secondary, colors.accent1, colors.accent2, colors.accent3], borderWidth: 0 }]
-                    },
-                    options: { maintainAspectRatio: false, cutout: '70%' }
-                });
-            } else {
-                document.getElementById('val-top-browser').innerText = 'N/A';
-            }
-            document.querySelector('#w-browser-top .loading-overlay').style.display = 'none';
+            fetchWidgetData('/api/analytics/browsers', 'w-browser-dist').then(browserData => {
+                if (browserData && browserData.labels && browserData.labels.length > 0) {
+                    animateText('val-top-browser', browserData.labels[0].toUpperCase());
+                    new Chart(document.getElementById('chart-browsers'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: browserData.labels,
+                            datasets: [{ data: browserData.values, backgroundColor: [colors.primary, colors.secondary, colors.accent1, colors.accent2, colors.accent3], borderWidth: 0 }]
+                        },
+                        options: { maintainAspectRatio: false, cutout: '70%' }
+                    });
+                } else {
+                    const browserVal = document.getElementById('val-top-browser');
+                    if (browserVal) browserVal.innerText = 'N/A';
+                }
+                const browserTopOverlay = document.querySelector('#w-browser-top .loading-overlay');
+                if (browserTopOverlay) browserTopOverlay.style.display = 'none';
+            });
 
             // TIER 2 & 3: CHARTS
-            const growthData = await fetchWidgetData('/api/analytics/growth', 'w5-growth');
-            if (growthData && growthData.labels) {
-                new Chart(document.getElementById('chart-growth'), {
-                    type: 'line',
-                    data: {
-                        labels: growthData.labels,
-                        datasets: [{ label: 'New Subscribers', data: growthData.values, borderColor: colors.primary, backgroundColor: colors.bgPrimary, fill: true, tension: 0.4 }]
-                    },
-                    options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
-                });
-            }
+            fetchWidgetData('/api/analytics/growth', 'w5-growth').then(growthData => {
+                if (growthData && growthData.labels) {
+                    new Chart(document.getElementById('chart-growth'), {
+                        type: 'line',
+                        data: {
+                            labels: growthData.labels,
+                            datasets: [{ label: 'New Subscribers', data: growthData.values, borderColor: colors.primary, backgroundColor: colors.bgPrimary, fill: true, tension: 0.4 }]
+                        },
+                        options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                    });
+                }
+            });
 
-            const funnelData = await fetchWidgetData('/api/analytics/funnel', 'w6-funnel');
-            if (funnelData && funnelData.total !== undefined) {
-                new Chart(document.getElementById('chart-funnel'), {
-                    type: 'bar',
-                    data: {
-                        labels: ['Total Signups', 'Pending', 'Verified'],
-                        datasets: [{ data: [funnelData.total, funnelData.pending, funnelData.verified], backgroundColor: [colors.accent1, colors.accent2, colors.secondary], borderRadius: 6 }]
-                    },
-                    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, indexAxis: 'y' }
-                });
-            }
+            fetchWidgetData('/api/analytics/funnel', 'w6-funnel').then(funnelData => {
+                if (funnelData && funnelData.total !== undefined) {
+                    new Chart(document.getElementById('chart-funnel'), {
+                        type: 'bar',
+                        data: {
+                            labels: ['Total Signups', 'Pending', 'Verified'],
+                            datasets: [{ data: [funnelData.total, funnelData.pending, funnelData.verified], backgroundColor: [colors.accent1, colors.accent2, colors.secondary], borderRadius: 6 }]
+                        },
+                        options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, indexAxis: 'y' }
+                    });
+                }
+            });
 
-            const pageData = await fetchWidgetData('/api/analytics/pages', 'w-top-pages');
-            if (pageData && pageData.labels) {
-                new Chart(document.getElementById('chart-pages'), {
-                    type: 'bar',
-                    data: {
-                        labels: pageData.labels.map(url => url.replace('https://', '').split('?')[0]),
-                        datasets: [{ label: 'Views', data: pageData.values, backgroundColor: colors.primary, borderRadius: 4 }]
-                    },
-                    options: { maintainAspectRatio: false, indexAxis: 'y' }
-                });
-            }
+            fetchWidgetData('/api/analytics/pages', 'w-top-pages').then(pageData => {
+                if (pageData && pageData.labels) {
+                    new Chart(document.getElementById('chart-pages'), {
+                        type: 'bar',
+                        data: {
+                            labels: pageData.labels.map(url => url.replace('https://', '').split('?')[0]),
+                            datasets: [{ label: 'Views', data: pageData.values, backgroundColor: colors.primary, borderRadius: 4 }]
+                        },
+                        options: { maintainAspectRatio: false, indexAxis: 'y' }
+                    });
+                }
+            });
 
-            const topicsData = await fetchWidgetData('/api/analytics/topics', 'w9-topics');
-            if (topicsData && topicsData.labels) {
-                new Chart(document.getElementById('chart-topics'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: topicsData.labels,
-                        datasets: [{ data: topicsData.values, backgroundColor: [colors.primary, colors.secondary, colors.accent1, colors.accent2, colors.accent3], borderWidth: 0 }]
-                    },
-                    options: { maintainAspectRatio: false, cutout: '70%' }
-                });
-            }
+            fetchWidgetData('/api/analytics/topics', 'w9-topics').then(topicsData => {
+                if (topicsData && topicsData.labels) {
+                    new Chart(document.getElementById('chart-topics'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: topicsData.labels,
+                            datasets: [{ data: topicsData.values, backgroundColor: [colors.primary, colors.secondary, colors.accent1, colors.accent2, colors.accent3], borderWidth: 0 }]
+                        },
+                        options: { maintainAspectRatio: false, cutout: '70%' }
+                    });
+                }
+            });
 
-            const latencyData = await fetchWidgetData('/api/analytics/latency', 'w7-latency');
-            if (latencyData && latencyData.labels) {
-                new Chart(document.getElementById('chart-latency'), {
-                    type: 'line',
-                    data: {
-                        labels: latencyData.labels,
-                        datasets: [{ label: 'Avg Latency (ms)', data: latencyData.values, borderColor: colors.secondary, tension: 0.1, pointRadius: 2 }]
-                    },
-                    options: { maintainAspectRatio: false }
-                });
-            }
+            fetchWidgetData('/api/analytics/latency', 'w7-latency').then(latencyData => {
+                if (latencyData && latencyData.labels) {
+                    new Chart(document.getElementById('chart-latency'), {
+                        type: 'line',
+                        data: {
+                            labels: latencyData.labels,
+                            datasets: [{ label: 'Avg Latency (ms)', data: latencyData.values, borderColor: colors.secondary, tension: 0.1, pointRadius: 2 }]
+                        },
+                        options: { maintainAspectRatio: false }
+                    });
+                }
+            });
 
-            const scrollData = await fetchWidgetData('/api/analytics/scroll', 'w8-scroll');
-            if (scrollData && scrollData.labels) {
-                new Chart(document.getElementById('chart-scroll'), {
-                    type: 'bar',
-                    data: {
-                        labels: scrollData.labels,
-                        datasets: [{ label: 'Users reached', data: scrollData.values, backgroundColor: colors.primary, borderRadius: 4 }]
-                    },
-                    options: { maintainAspectRatio: false }
-                });
-            }
+            fetchWidgetData('/api/analytics/scroll', 'w8-scroll').then(scrollData => {
+                if (scrollData && scrollData.labels) {
+                    new Chart(document.getElementById('chart-scroll'), {
+                        type: 'bar',
+                        data: {
+                            labels: scrollData.labels,
+                            datasets: [{ label: 'Users reached', data: scrollData.values, backgroundColor: colors.primary, borderRadius: 4 }]
+                        },
+                        options: { maintainAspectRatio: false }
+                    });
+                }
+            });
 
-            const exceptions = await fetchWidgetData('/api/analytics/exceptions', 'w10-exceptions');
-            if (exceptions && exceptions.length > 0) {
-                const list = document.getElementById('feed-exceptions');
-                list.innerHTML = exceptions.map(e => `<li>[${new Date(e.timestamp).toLocaleTimeString()}] <strong>${e.type}</strong>: ${e.message} <br/><span style="color:#888;font-size:10px;">${e.url}</span></li>`).join('');
-            } else if (exceptions) {
-                document.getElementById('feed-exceptions').innerHTML = '<li>No recent exceptions detected! All good.</li>';
-            }
+            fetchWidgetData('/api/analytics/exceptions', 'w10-exceptions').then(exceptions => {
+                if (exceptions && exceptions.length > 0) {
+                    const list = document.getElementById('feed-exceptions');
+                    list.innerHTML = exceptions.map(e => `<li>[${new Date(e.timestamp).toLocaleTimeString()}] <strong>${e.type}</strong>: ${e.message} <br/><span style="color:#888;font-size:10px;">${e.url}</span></li>`).join('');
+                } else if (exceptions) {
+                    document.getElementById('feed-exceptions').innerHTML = '<li>No recent exceptions detected! All good.</li>';
+                }
+            });
 
-            const subscribers = await fetchWidgetData('/api/analytics/recent-subscribers', 'w11-subscribers');
-            if (subscribers && subscribers.length !== undefined) {
-                const tbody = document.getElementById('table-subscribers');
-                tbody.innerHTML = subscribers.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.email}</td><td><span class="badge ${s.isVerified ? 'verified' : 'pending'}">${s.isVerified ? 'Verified' : 'Pending'}</span></td></tr>`).join('');
-            }
+            fetchWidgetData('/api/analytics/recent-subscribers', 'w11-subscribers').then(subscribers => {
+                if (subscribers && subscribers.length !== undefined) {
+                    const tbody = document.getElementById('table-subscribers');
+                    tbody.innerHTML = subscribers.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.email}</td><td><span class="badge ${s.isVerified ? 'verified' : 'pending'}">${s.isVerified ? 'Verified' : 'Pending'}</span></td></tr>`).join('');
+                }
+            });
 
-            const inquiries = await fetchWidgetData('/api/analytics/recent-inquiries', 'w12-inquiries');
-            if (inquiries && inquiries.length !== undefined) {
-                const tbody = document.getElementById('table-inquiries');
-                tbody.innerHTML = inquiries.map(i => `<tr><td><strong>${i.name}</strong><br><span style="color:#888; font-size:11px;">${i.email}</span></td><td>${i.topic}</td><td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${i.message}">${i.message}</td></tr>`).join('');
-            }
-            // Final cleanup: Remove all skeleton classes
-            document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
+            fetchWidgetData('/api/analytics/recent-inquiries', 'w12-inquiries').then(inquiries => {
+                if (inquiries && inquiries.length !== undefined) {
+                    const tbody = document.getElementById('table-inquiries');
+                    tbody.innerHTML = inquiries.map(i => `<tr><td><strong>${i.name}</strong><br><span style="color:#888; font-size:11px;">${i.email}</span></td><td>${i.topic}</td><td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${i.message}">${i.message}</td></tr>`).join('');
+                }
+            });
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -690,7 +725,7 @@
             const title = document.getElementById('main-title');
             if (title) {
                 const text = title.innerText;
-                title.innerHTML = text.split('').map((char, i) => `<span class="letter" style="display:inline-block; color:${char === 'A' ? '#e7e7e3' : 'inherit'}">${char}</span>`).join('');
+                title.innerHTML = text.split('').map((char, i) => `<span class="letter" style="display:inline-block; color:${char === 'A' ? 'var(--highlight)' : 'inherit'}">${char}</span>`).join('');
             }
 
             const tl = gsap.timeline();

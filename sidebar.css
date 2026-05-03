@@ -1,33 +1,76 @@
 /* BLAST STUDIO - LIQUID RIGHT NAV SYSTEM */
 
 :root {
-  --nav-bg: rgba(255, 255, 255, 0.03);
-  --nav-blur: 20px;
-  --nav-border: rgba(255, 255, 255, 0.1);
+  --nav-bg: rgba(255, 255, 255, 0.08);
+  --nav-blur: 25px;
+  --nav-border: rgba(255, 255, 255, 0.15);
   --nav-text: #FFFFFF;
-  --nav-active-bg: rgba(255, 255, 255, 0.1);
-  --nav-collapsed: 70px;
-  --nav-expanded: 220px;
+  --nav-active-bg: rgba(255, 255, 255, 0.15);
+  --nav-collapsed: 80px;
+  --nav-expanded: 240px;
+  
+  /* Shared Theme Tokens */
+  --primary:     #FF2D2D;
+  --secondary:   #FF2D2D;
+  --bg:          #111111;
+  --surface:     #161616;
+  --border:      #333333;
+  --text:        #FFFFFF;
+  --text-sub:    #999999;
+  --text-faint:  #444444;
+  --accent:      #FF2D2D;
+  --sidebar-bg:  #0a0a0a;
+  --sidebar-text:#888888;
+  --highlight:   #e7e7e3;
+  --surface-2:   #1d1d1d;
+  --surface-3:   #222222;
+  --table-header:#1a1a1a;
+}
+
+.light-mode {
+  --bg:          #F5F5F7;
+  --surface:     #FFFFFF;
+  --border:      #D1D1D6;
+  --text:        #1D1D1F;
+  --text-sub:    #86868B;
+  --text-faint:  #C1C1C6;
+  --sidebar-bg:  #FFFFFF;
+  --sidebar-text:#555555;
+  --nav-bg:      rgba(255, 255, 255, 0.8);
+  --nav-border:  rgba(0, 0, 0, 0.15);
+  --nav-text:    #1D1D1F;
+  --nav-active-bg: rgba(0, 0, 0, 0.05);
+  --highlight:   #1D1D1F;
+  --surface-2:   #E5E5E7;
+  --surface-3:   #D1D1D6;
+  --table-header:#E5E5E7;
 }
 
 .sidebar {
   position: fixed;
-  right: 20px;
-  top: 20px;
-  bottom: 20px;
+  left: 0;
+  top: 0;
+  bottom: 0;
   width: var(--nav-collapsed);
   background: var(--nav-bg);
   backdrop-filter: blur(var(--nav-blur));
   -webkit-backdrop-filter: blur(var(--nav-blur));
-  border: 1px solid var(--nav-border);
-  border-radius: 40px;
+  border-right: 1px solid var(--nav-border);
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 30px 10px;
+  padding: 30px 0;
   z-index: 10000;
   transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
+  box-shadow: 10px 0 30px rgba(0,0,0,0.3);
+  animation: sidebarIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes sidebarIn {
+  from { transform: translateX(-100px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 .sidebar:hover {
@@ -36,11 +79,11 @@
 
 .sidebar-header {
   display: flex;
-  flex-direction: row-reverse;
+  flex-direction: row;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   width: 100%;
-  padding: 0 5px;
+  padding: 0;
   margin-bottom: 30px;
   box-sizing: border-box;
 }
@@ -67,10 +110,15 @@
   overflow: hidden;
 }
 
+.sidebar:hover .sidebar-header {
+  justify-content: flex-start;
+  padding: 0 25px;
+}
+
 .sidebar:hover .sidebar-brand {
   opacity: 1;
   width: auto;
-  margin-right: 12px;
+  margin-left: 12px;
 }
 
 .sidebar-footer-group {
@@ -115,13 +163,13 @@
   width: 0;
   white-space: nowrap;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  text-align: right;
+  text-align: left;
 }
 
 .sidebar:hover .logout-link {
   background: rgba(255, 45, 45, 0.1); /* Red tint on hover */
   color: #FF2D2D;
-  flex-direction: row-reverse;
+  flex-direction: row;
   justify-content: flex-start;
 }
 
@@ -129,7 +177,7 @@
   opacity: 1;
   width: auto;
   flex-grow: 1;
-  margin-right: 15px;
+  margin-left: 15px;
 }
 
 .sidebar-footer {
@@ -151,7 +199,38 @@
 .sidebar-footer img {
   height: 22px;
   filter: brightness(0) invert(1); /* Forces the entire logo to render as pure solid white */
-  transition: height 0.3s;
+  transition: height 0.3s, filter 0.3s;
+}
+
+.light-mode .sidebar-footer img {
+  filter: none; /* Show original logo colors in light mode */
+}
+
+.theme-toggle {
+  cursor: pointer;
+  border-top: 1px solid var(--nav-border);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.theme-toggle svg .sun { display: none; }
+.theme-toggle svg .moon { display: block; }
+
+.light-mode .theme-toggle svg .sun { display: block; }
+.light-mode .theme-toggle svg .moon { display: none; }
+
+.light-mode .nav-links a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.light-mode .sidebar:hover .nav-links a {
+  background: rgba(0, 0, 0, 0.03);
+  color: #000000;
+}
+
+.light-mode .nav-links a.active {
+  background: var(--nav-active-bg);
+  color: var(--primary) !important;
 }
 
 .nav-links {
@@ -173,11 +252,16 @@
   border-radius: 100px;
   transition: all 0.3s;
   display: flex;
-  flex-direction: row-reverse; /* Icon on the right edge */
+  flex-direction: row;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   width: 100%;
   box-sizing: border-box;
+}
+
+.sidebar:hover .nav-links a {
+    justify-content: flex-start;
+    padding-left: 25px;
 }
 
 .nav-links a svg {
@@ -185,7 +269,10 @@
   height: 20px;
   min-width: 20px;
   stroke-width: 2;
-  transition: all 0.3s;
+  /* Animation: icon micro-rotation on hover — Delight per handbook §2.5 */
+  transition:
+    transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity   150ms ease;
 }
 
 .nav-links a span {
@@ -193,19 +280,23 @@
   width: 0;
   white-space: nowrap;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  text-align: right;
+  text-align: left;
 }
 
 .sidebar:hover .nav-links a {
   background: rgba(255, 255, 255, 0.03);
   color: #FFFFFF;
 }
+/* Icon tilts slightly on hover — communicates interactivity */
+.sidebar:hover .nav-links a:hover svg {
+  transform: rotate(5deg) translateY(-1px);
+}
 
 .sidebar:hover .nav-links a span {
   opacity: 1;
   width: auto;
-  flex-grow: 1; /* Pushes the icon to the right side of the pill */
-  margin-right: 15px; /* Gap between text and icon */
+  flex-grow: 1;
+  margin-left: 15px; /* Gap between text and icon */
 }
 
 .nav-links a.active {
@@ -213,11 +304,23 @@
   color: #FFFFFF !important;
 }
 
-/* Adjust Main Content for Right Sidebar */
+/* Adjust Main Content for Left Sidebar */
 .main-content {
-  margin-left: 0 !important;
-  margin-right: 100px !important;
+  margin-left: 80px !important;
+  margin-right: 0 !important;
   margin-top: 0 !important;
   padding: 60px;
-  width: calc(100% - 100px) !important;
+  width: calc(100% - 80px) !important;
+}
+
+/* ── Accessibility: prefers-reduced-motion (handbook §8.4) ───────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration:        0.01ms !important;
+    animation-iteration-count: 1      !important;
+    transition-duration:       0.01ms !important;
+    scroll-behavior:           auto   !important;
+  }
 }

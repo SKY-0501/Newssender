@@ -4,14 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ECHOMAIL | Verification</title>
+    <link rel="stylesheet" href="sidebar.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --primary: #FF2D2D;
-            --bg: #0a0a0a;
-            --text: #ffffff;
-            --highlight: #e7e7e3;
-        }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
         body { 
@@ -68,6 +64,8 @@
             outline: none;
             width: 100%;
             letter-spacing: -1px;
+            /* Animation: border-color only — Feedback on focus per handbook §3.2 */
+            transition: border-color 150ms cubic-bezier(0.16, 1, 0.3, 1);
         }
         input::placeholder { color: #222; }
         input:focus { border-bottom-color: var(--primary); }
@@ -106,6 +104,26 @@
             to { opacity: 1; transform: translateY(0); }
         }
         .auth-container { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        /* Button press: spring feedback — Feedback per handbook §3.2 */
+        button {
+            transition:
+              transform  150ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              opacity    150ms ease;
+        }
+        button:hover  { transform: translateY(-2px) scale(1.03); }
+        button:active { transform: scale(0.96); transition-duration: 80ms; }
+
+        /* ── Accessibility: prefers-reduced-motion (handbook §8.4) ─────────── */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration:        0.01ms !important;
+                animation-iteration-count: 1      !important;
+                transition-duration:       0.01ms !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -126,7 +144,7 @@
 
         <div class="counter-area" id="counterArea">
             <div class="counter-value" id="counter">0</div>
-            <div id="statusText" class="counter-unit">Initializing personality...</div>
+            <div id="statusText" class="counter-unit">Synchronizing...</div>
         </div>
     </div>
 
@@ -138,25 +156,13 @@
     <script>
         const ALLOWED_NAMES = ['aakash', 'rahul', 'mamta', 'panchali', 'geethanjali', 'aaron', 'ishani'];
         
-        const FUNNY_STATUSES = [
-            "Brewing coffee for the server...",
-            "Checking if you're actually working...",
-            "Calculating the meaning of life (it's 42)...",
-            "Polishing the red buttons...",
-            "Counting your mistakes...",
-            "Ignoring my own bugs...",
-            "Loading your ego...",
-            "Finalizing world domination plans...",
-            "Deleting System32... just kidding...",
-            "Syncing with the mothership..."
-        ];
-
         const SUCCESS_MESSAGES = [
-            `heyy its you <span class="name-highlight">#NAME#</span>, I forgot it was you... <br><span style="font-size: 14px; color: #444; font-weight: 500;">(Wait, are you still wearing those socks?)</span>`,
-            `Ah, <span class="name-highlight">#NAME#</span>! I was wondering when you'd show up. <br><span style="font-size: 14px; color: #444; font-weight: 500;">(Your clearance level has been slightly upgraded...)</span>`,
-            `Welcome back, <span class="name-highlight">#NAME#</span>. The system missed you. <br><span style="font-size: 14px; color: #444; font-weight: 500;">(But mostly it just missed your typing speed...)</span>`,
-            `Access Granted, <span class="name-highlight">#NAME#</span>. <br><span style="font-size: 14px; color: #444; font-weight: 500;">(Don't break anything, please...)</span>`,
-            `Oh, it's just <span class="name-highlight">#NAME#</span>. Let them in. <br><span style="font-size: 14px; color: #444; font-weight: 500;">(I've temporarily lowered the security protocols for you.)</span>`
+            `Hey <span class="name-highlight">#NAME#</span>, recognized your digital signature immediately. <br><span style="font-size: 14px; color: var(--text-sub); font-weight: 500;">(Preparing your personal dashboard...)</span>`,
+            `Ah, <span class="name-highlight">#NAME#</span>! I was wondering when you'd show up. <br><span style="font-size: 14px; color: var(--text-sub); font-weight: 500;">(Your clearance level has been slightly upgraded...)</span>`,
+            `Welcome back, <span class="name-highlight">#NAME#</span>. The system missed you. <br><span style="font-size: 14px; color: var(--text-sub); font-weight: 500;">(But mostly it just missed your typing speed...)</span>`,
+            `Identity Verified: <span class="name-highlight">#NAME#</span>. <br><span style="font-size: 14px; color: var(--text-sub); font-weight: 500;">(Please confirm your Microsoft credentials to continue...)</span>`,
+            `Oh, it's just <span class="name-highlight">#NAME#</span>. Let them in. <br><span style="font-size: 14px; color: var(--text-sub); font-weight: 500;">(I've temporarily lowered the security protocols for you.)</span>`,
+            `Initiating sequence for <span class="name-highlight">#NAME#</span>... <br><span style="font-size: 14px; color: var(--text-sub); font-weight: 500;">(Warning: Genius at work. Proceed with caution.)</span>`
         ];
 
         const FAIL_MESSAGES = [
@@ -175,6 +181,15 @@
         const counterVal = document.getElementById('counter');
         const statusText = document.getElementById('statusText');
 
+        const FUNNY_STATUSES = [
+            "Authenticating with high heavens...",
+            "Checking Microsoft clearance...",
+            "Bribing the firewall...",
+            "Polishing the red buttons...",
+            "Finalizing world domination plans...",
+            "Syncing with the mothership..."
+        ];
+
         // Check if already authenticated on load
         async function checkAuth() {
             try {
@@ -183,11 +198,35 @@
                 if (user.isAuthenticated) {
                     // Check if the user email is from orchvate
                     if (user.email.endsWith('@orchvate.com')) {
-                        mainMsg.innerHTML = `Welcome back, <span class="name-highlight">${user.name}</span>. <br><span style="font-size: 14px; color: #444; font-weight: 500;">(Identity verified via Microsoft. Redirecting...)</span>`;
+                        mainMsg.innerHTML = `Welcome back, <span class="name-highlight">${user.name}</span>. <br><span style="font-size: 14px; color: var(--text-sub); font-weight: 500;">(Identity confirmed. Initializing core synchronization...)</span>`;
                         inputArea.style.display = 'none';
-                        setTimeout(() => {
-                            window.location.href = 'dashboard.html';
-                        }, 1500);
+                        
+                        // Start Counter Sequence HERE
+                        counterArea.style.display = 'block';
+                        let countObj = { val: 0 };
+                        
+                        // Status Cycle
+                        let sIdx = 0;
+                        const sInt = setInterval(() => {
+                            statusText.innerText = FUNNY_STATUSES[sIdx % FUNNY_STATUSES.length];
+                            sIdx++;
+                        }, 350);
+
+                        gsap.to(countObj, {
+                            val: 100,
+                            duration: 3,
+                            ease: "power2.inOut",
+                            onUpdate: () => {
+                                counterVal.innerText = Math.floor(countObj.val);
+                            },
+                            onComplete: () => {
+                                clearInterval(sInt);
+                                statusText.innerText = "Access Granted.";
+                                setTimeout(() => {
+                                    window.location.href = 'dashboard.html';
+                                }, 800);
+                            }
+                        });
                     } else {
                         mainMsg.innerHTML = `Access Denied. <br><span style="font-size: 14px; color: var(--primary); font-weight: 500;">(Your Microsoft account ${user.email} is not authorized for this system.)</span>`;
                     }
@@ -204,11 +243,11 @@
 
         function handleVerification(name) {
             if (ALLOWED_NAMES.includes(name)) {
-                // Success - Phase 1
+                // Success - Show Microsoft Button Immediately
                 const msg = SUCCESS_MESSAGES[Math.floor(Math.random() * SUCCESS_MESSAGES.length)];
                 mainMsg.innerHTML = msg.replace('#NAME#', name) + `<br><br><button onclick="triggerAzure()" style="background: var(--primary); color: white; border: none; padding: 12px 24px; font-weight: 900; cursor: pointer; border-radius: 4px; animation: reveal 0.5s ease forwards;">VERIFY WITH MICROSOFT</button>`;
                 inputArea.classList.add('hidden');
-                inputArea.style.pointerEvents = 'none';
+                mainMsg.style.display = 'block';
             } else {
                 // Failure
                 const msg = FAIL_MESSAGES[Math.floor(Math.random() * FAIL_MESSAGES.length)];

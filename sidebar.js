@@ -1,4 +1,13 @@
+// Immediate Theme Initialization (prevents flash)
+(function() {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    if (savedTheme === 'light') {
+        document.documentElement.classList.add('light-mode');
+    }
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('Sidebar script initializing...');
     const sidebarHTML = `
     <nav class="sidebar" id="mainSidebar">
       <div class="sidebar-header">
@@ -28,6 +37,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </a>
       </div>
       <div class="sidebar-footer-group">
+        <div class="theme-toggle nav-links">
+          <a id="themeToggleBtn">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path class="sun" d="M12 3v1m0 16v1m9-9h-1M4 11H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" stroke-linecap="round" stroke-linejoin="round" />
+              <path class="moon" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span id="themeLabel">Dark Mode</span>
+          </a>
+        </div>
         <a href="/logout" id="nav-logout" class="logout-link" onclick="sessionStorage.clear()">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke-linecap="round" stroke-linejoin="round" /></svg>
           <span>Logout</span>
@@ -60,5 +78,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const activeLink = document.getElementById(activeId);
             if (activeLink) activeLink.classList.add('active');
         }
+
+        // Theme Toggle Logic
+        const toggleBtn = document.getElementById('themeToggleBtn');
+        const themeLabel = document.getElementById('themeLabel');
+        
+        const updateLabel = () => {
+            const isLight = document.documentElement.classList.contains('light-mode');
+            themeLabel.innerText = isLight ? 'Light Mode' : 'Dark Mode';
+        };
+        
+        updateLabel();
+
+        toggleBtn.addEventListener('click', () => {
+            const isLight = document.documentElement.classList.toggle('light-mode');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+            updateLabel();
+            
+            // Dispatch event for other components to react if needed
+            window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: isLight ? 'light' : 'dark' } }));
+        });
+        console.log('Sidebar successfully injected.');
+    } else {
+        console.warn('Sidebar placeholder (#sidebar-placeholder) not found in this page.');
     }
 });
