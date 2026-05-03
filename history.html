@@ -25,6 +25,7 @@
       checkAuthStatus();
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <style>
         :root {
             --primary:    #FF2D2D;
@@ -178,14 +179,20 @@
         @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
         .syncing { animation: pulse 1.5s infinite; }
         .empty-state { text-align:center; padding:60px 20px; color:#a0a0a0; font-size:14px; }
-        /* REVEAL ANIMATION */
-        @keyframes reveal {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        
+        /* SHIMMER SKELETON */
+        .skeleton {
+            background: linear-gradient(90deg, #161616 25%, #1d1d1d 50%, #161616 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
         }
-        .sidebar { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .header { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards; opacity: 0; }
-        .container { animation: reveal 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards; opacity: 0; }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .skeleton-card { height: 120px; margin-bottom: 12px; border: 1px solid #222; border-radius: 8px; }
+        /* REVEAL ANIMATION Handled by GSAP */
     </style>
 </head>
 <body>
@@ -194,7 +201,7 @@
 
     <main class="main-content">
         <div class="header">
-            <h1>H<span style="color:#e7e7e3">I</span>STORY</h1>
+            <h1 id="main-title">HISTORY</h1>
             <p>Complete archive of all past newsletter transmissions and delivery reports.</p>
         </div>
         <style>
@@ -212,7 +219,11 @@
                     <span style="font-size: 14px;">🔄</span> Syncing...
                 </div>
             </div>
-            <div class="blast-card-grid" id="history-cards"></div>
+            <div class="blast-card-grid" id="history-cards">
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+                <div class="skeleton skeleton-card"></div>
+            </div>
         </div>
 
         <!-- Right: Recipient Details -->
@@ -318,11 +329,23 @@
                         await fetch(`/api/analytics/sync-blast/${blast.batchId}`, { method: 'POST' });
                     }
                     document.getElementById('syncIndicator').style.display = 'none';
-                    loadHistory(false);
                     if (selectedBatchId) selectBlast(selectedBatchId, null);
                 }
+
+                // Animate Cards Entrance: Slide from Left
+                gsap.from(".blast-card", {
+                    opacity: 0,
+                    x: -100,
+                    stagger: 0.08,
+                    duration: 0.8,
+                    ease: "power3.out",
+                    clearProps: "all"
+                });
             } catch (e) {
                 console.error('Load failed', e);
+            } finally {
+                // Remove skeleton loaders
+                document.querySelectorAll('.skeleton').forEach(el => el.style.display = 'none');
             }
         }
 
@@ -370,13 +393,44 @@
                         </tbody>
                     </table>
                 `;
+
+                // Animate Details: Slide from Right
+                gsap.from("#detailsContainer", {
+                    opacity: 0,
+                    x: 50,
+                    duration: 0.8,
+                    ease: "power2.out"
+                });
             } catch (e) {
                 container.innerHTML = '<div class="empty-state" style="color:var(--danger);">Failed to load emails.</div>';
             }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadHistory(true); // Trigger auto-sync on first load
+            // Split title for staggered entrance
+            const title = document.getElementById('main-title');
+            const text = title.innerText;
+            title.innerHTML = text.split('').map((char, i) => `<span class="letter" style="display:inline-block; color:${char === 'I' ? '#e7e7e3' : 'inherit'}">${char}</span>`).join('');
+
+            const tl = gsap.timeline();
+            tl.from(".letter", { 
+                opacity: 0, 
+                y: 30,
+                stagger: 0.05, 
+                duration: 0.8, 
+                ease: "back.out(1.7)" 
+            })
+            .from(".header p", { opacity: 0, y: 10, duration: 0.6 }, "-=0.4")
+            .from(".widget", { 
+                opacity: 0, 
+                y: 40, 
+                duration: 1, 
+                stagger: 0.2,
+                ease: "power3.out",
+                clearProps: "all"
+            }, "-=0.4");
+
+            loadHistory(true); 
         });
     </script>
     </main>

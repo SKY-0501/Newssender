@@ -25,6 +25,7 @@
       checkAuthStatus();
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <style>
         :root {
             --primary:     #FF2D2D;
@@ -92,14 +93,20 @@
 
         .loading { text-align: center; padding: 40px; color: #555; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
 
-        /* REVEAL ANIMATION */
-        @keyframes reveal {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* SHIMMER SKELETON */
+        .skeleton {
+            background: linear-gradient(90deg, #161616 25%, #1d1d1d 50%, #161616 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
         }
-        .sidebar { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .header { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards; opacity: 0; }
-        .widget { animation: reveal 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards; opacity: 0; }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .skeleton-row { height: 40px; margin-bottom: 8px; width: 100%; }
+
+        /* REVEAL ANIMATION Handled by GSAP */
     </style>
 </head>
 <body>
@@ -108,7 +115,7 @@
 
     <main class="main-content">
         <div class="header">
-            <h1>S<span style="color:#e7e7e3">U</span>BSCRIBERS</h1>
+            <h1 id="main-title">SUBSCRIBERS</h1>
             <p>Direct database view of all verified and pending newsletter participants.</p>
         </div>
         <style>
@@ -121,7 +128,11 @@
             <input type="text" class="search-bar" placeholder="SEARCH SUBSCRIBERS..." onkeyup="filterTable(this)">
             
             <div id="tableContainer">
-                <div class="loading">SYNCING DATABASE...</div>
+                <div class="skeleton skeleton-row"></div>
+                <div class="skeleton skeleton-row"></div>
+                <div class="skeleton skeleton-row"></div>
+                <div class="skeleton skeleton-row"></div>
+                <div class="skeleton skeleton-row"></div>
             </div>
         </div>
     </main>
@@ -158,8 +169,20 @@
 
                 html += `</tbody></table>`;
                 container.innerHTML = html;
+
+                // Animate Rows Entrance: Top-Down Bounce
+                gsap.from("#subTable tbody tr", {
+                    opacity: 0,
+                    y: -30,
+                    stagger: 0.03,
+                    duration: 0.7,
+                    ease: "bounce.out"
+                });
             } catch (err) {
                 container.innerHTML = `<div class="loading" style="color:var(--primary)">CONNECTION ERROR: DATABASE OFFLINE</div>`;
+            } finally {
+                // Remove skeletons
+                document.querySelectorAll('.skeleton').forEach(el => el.style.display = 'none');
             }
         }
 
@@ -178,7 +201,31 @@
             }
         }
 
-        loadSubscribers();
+        document.addEventListener('DOMContentLoaded', () => {
+            // Split title for staggered entrance
+            const title = document.getElementById('main-title');
+            const text = title.innerText;
+            title.innerHTML = text.split('').map((char, i) => `<span class="letter" style="display:inline-block; color:${char === 'U' ? '#e7e7e3' : 'inherit'}">${char}</span>`).join('');
+
+            const tl = gsap.timeline();
+            tl.from(".letter", { 
+                opacity: 0, 
+                y: 30,
+                stagger: 0.05, 
+                duration: 0.8, 
+                ease: "back.out(1.7)" 
+            })
+            .from(".header p", { opacity: 0, y: 10, duration: 0.6 }, "-=0.4")
+            .from(".widget", { 
+                opacity: 0, 
+                y: 40, 
+                duration: 1, 
+                ease: "power3.out",
+                clearProps: "all"
+            }, "-=0.4");
+
+            loadSubscribers();
+        });
     </script>
 </body>
 </html>

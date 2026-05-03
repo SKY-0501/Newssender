@@ -234,6 +234,20 @@
             .navbar { flex-direction: column; gap: 15px; }
         }
 
+        /* SHIMMER SKELETON */
+        .skeleton {
+            background: linear-gradient(90deg, #161616 25%, #1d1d1d 50%, #161616 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .skeleton-kpi { height: 48px; width: 60%; margin: 10px auto; }
+        .skeleton-chart { height: 200px; width: 100%; }
+
         /* REVEAL ANIMATION Handled by GSAP */
     </style>
 </head>
@@ -243,7 +257,7 @@
 
     <main class="main-content">
         <div class="header">
-            <h1>A<span style="color:#e7e7e3">N</span>ALYTICS</h1>
+            <h1 id="main-title">ANALYTICS</h1>
             <p>Real-time telemetry and subscriber growth metrics from the production database.</p>
         </div>
         <style>
@@ -461,10 +475,47 @@
             });
         }
 
+        // GSAP Text Scramble (Free version approach)
+        function animateText(id, finalValue, duration = 1.5) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            const obj = { i: 0 };
+            gsap.to(obj, {
+                i: finalValue.length,
+                duration: duration,
+                ease: "power1.inOut",
+                onUpdate: () => {
+                    let scrambled = "";
+                    for (let j = 0; j < finalValue.length; j++) {
+                        if (j < Math.floor(obj.i)) {
+                            scrambled += finalValue[j];
+                        } else {
+                            scrambled += chars[Math.floor(Math.random() * chars.length)];
+                        }
+                    }
+                    el.innerText = scrambled;
+                }
+            });
+        }
+
         async function initDashboard() {
+            // Split title for staggered entrance
+            const title = document.getElementById('main-title');
+            const text = title.innerText;
+            title.innerHTML = text.split('').map((char, i) => `<span class="letter" style="display:inline-block; color:${char === 'N' ? '#e7e7e3' : 'inherit'}">${char}</span>`).join('');
+
             // Overall Page Landing Animation
             const tl = gsap.timeline();
-            tl.from(".header", { y: -20, opacity: 0, duration: 0.8, ease: "power3.out" })
+            tl.from(".header p", { opacity: 0, y: 10, duration: 1 })
+              .from(".letter", { 
+                  opacity: 0, 
+                  y: 50, 
+                  rotationX: -90, 
+                  stagger: 0.05, 
+                  duration: 0.8, 
+                  ease: "back.out(1.7)" 
+              }, "-=1")
               .from(".widget", {
                   y: 30,
                   opacity: 0,
@@ -472,7 +523,7 @@
                   stagger: 0.04,
                   ease: "power2.out",
                   clearProps: "all"
-              }, "-=0.4");
+              }, "-=0.5");
 
             // TIER 1: KPIs (SQL based)
             const kpis = await fetchWidgetData('/api/analytics/kpis', 'w1-subscribers');
@@ -507,7 +558,7 @@
             // Geo Distribution
             const geoData = await fetchWidgetData('/api/analytics/geo', 'w-geo-dist');
             if (geoData && geoData.labels && geoData.labels.length > 0) {
-                document.getElementById('val-top-geo').innerText = geoData.labels[0];
+                animateText('val-top-geo', geoData.labels[0].toUpperCase());
                 new Chart(document.getElementById('chart-geo'), {
                     type: 'bar',
                     data: {
@@ -524,7 +575,7 @@
             // Browser Distribution
             const browserData = await fetchWidgetData('/api/analytics/browsers', 'w-browser-dist');
             if (browserData && browserData.labels && browserData.labels.length > 0) {
-                document.getElementById('val-top-browser').innerText = browserData.labels[0];
+                animateText('val-top-browser', browserData.labels[0].toUpperCase());
                 new Chart(document.getElementById('chart-browsers'), {
                     type: 'doughnut',
                     data: {
@@ -630,11 +681,39 @@
                 const tbody = document.getElementById('table-inquiries');
                 tbody.innerHTML = inquiries.map(i => `<tr><td><strong>${i.name}</strong><br><span style="color:#888; font-size:11px;">${i.email}</span></td><td>${i.topic}</td><td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${i.message}">${i.message}</td></tr>`).join('');
             }
+            // Final cleanup: Remove all skeleton classes
+            document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
         }
 
-        document.addEventListener('DOMContentLoaded', initDashboard);
-    </script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Split title for staggered entrance
+            const title = document.getElementById('main-title');
+            if (title) {
+                const text = title.innerText;
+                title.innerHTML = text.split('').map((char, i) => `<span class="letter" style="display:inline-block; color:${char === 'A' ? '#e7e7e3' : 'inherit'}">${char}</span>`).join('');
+            }
 
+            const tl = gsap.timeline();
+            tl.from(".letter", { 
+                opacity: 0, 
+                y: 30,
+                stagger: 0.05, 
+                duration: 0.8, 
+                ease: "back.out(1.7)" 
+            })
+            .from(".header p", { opacity: 0, y: 10, duration: 0.6 }, "-=0.4")
+            .from(".widget", { 
+                opacity: 0, 
+                y: 40, 
+                duration: 1, 
+                stagger: 0.1,
+                ease: "power3.out",
+                clearProps: "all"
+            }, "-=0.4");
+
+            initDashboard();
+        });
+    </script>
     </main>
 </body>
 </html>
