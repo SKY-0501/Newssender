@@ -234,14 +234,7 @@
             .navbar { flex-direction: column; gap: 15px; }
         }
 
-        /* REVEAL ANIMATION */
-        @keyframes reveal {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .sidebar { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .header { animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards; opacity: 0; }
-        .dashboard-grid { animation: reveal 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards; opacity: 0; }
+        /* REVEAL ANIMATION Handled by GSAP */
     </style>
 </head>
 <body>
@@ -469,14 +462,17 @@
         }
 
         async function initDashboard() {
-            // Widget Landing Animation
-            gsap.from(".widget", {
-                y: 30,
-                opacity: 0,
-                duration: 0.8,
-                stagger: 0.1,
-                ease: "power2.out"
-            });
+            // Overall Page Landing Animation
+            const tl = gsap.timeline();
+            tl.from(".header", { y: -20, opacity: 0, duration: 0.8, ease: "power3.out" })
+              .from(".widget", {
+                  y: 30,
+                  opacity: 0,
+                  duration: 0.6,
+                  stagger: 0.04,
+                  ease: "power2.out",
+                  clearProps: "all"
+              }, "-=0.4");
 
             // TIER 1: KPIs (SQL based)
             const kpis = await fetchWidgetData('/api/analytics/kpis', 'w1-subscribers');
