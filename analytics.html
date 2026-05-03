@@ -26,6 +26,7 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <style>
         :root {
             --primary:    #FF2D2D;
@@ -449,20 +450,47 @@
             }
         }
 
+        // GSAP Number Counter
+        function animateNumber(id, endValue, suffix = '', decimals = 0) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const obj = { value: 0 };
+            gsap.to(obj, {
+                value: endValue,
+                duration: 2,
+                ease: "power3.out",
+                onUpdate: () => {
+                    el.innerText = obj.value.toLocaleString(undefined, {
+                        minimumFractionDigits: decimals,
+                        maximumFractionDigits: decimals
+                    }) + suffix;
+                }
+            });
+        }
+
         async function initDashboard() {
+            // Widget Landing Animation
+            gsap.from(".widget", {
+                y: 30,
+                opacity: 0,
+                duration: 0.8,
+                stagger: 0.1,
+                ease: "power2.out"
+            });
+
             // TIER 1: KPIs (SQL based)
             const kpis = await fetchWidgetData('/api/analytics/kpis', 'w1-subscribers');
             if (kpis && kpis.totalVerified !== undefined) {
-                document.getElementById('val-subscribers').innerText = kpis.totalVerified.toLocaleString();
-                document.getElementById('val-crosspoll').innerText = (kpis.crossPollinationRate || 0).toFixed(1) + '%';
+                animateNumber('val-subscribers', kpis.totalVerified);
+                animateNumber('val-crosspoll', kpis.crossPollinationRate || 0, '%', 1);
             }
             document.querySelector('#w2-crosspoll .loading-overlay').style.display = 'none';
             
             // KQL Based KPIs
             const kqlKpis = await fetchWidgetData('/api/analytics/kql-kpis', 'w3-activetime');
             if (kqlKpis && kqlKpis.avgActiveTime !== undefined) {
-                document.getElementById('val-activetime').innerText = kqlKpis.avgActiveTime + 's';
-                document.getElementById('val-mobile').innerText = (kqlKpis.mobilePercentage || 0).toFixed(1) + '%';
+                animateNumber('val-activetime', kqlKpis.avgActiveTime, 's', 1);
+                animateNumber('val-mobile', kqlKpis.mobilePercentage || 0, '%', 1);
             } else {
                 document.getElementById('val-activetime').innerText = '0s';
                 document.getElementById('val-mobile').innerText = '0.0%';
@@ -472,8 +500,8 @@
             // Frontend Performance
             const perf = await fetchWidgetData('/api/analytics/performance', 'w-perf-load');
             if (perf && perf.pageLoad !== undefined) {
-                document.getElementById('val-page-load').innerText = perf.pageLoad + 'ms';
-                document.getElementById('val-dom-content').innerText = perf.domContent + 'ms';
+                animateNumber('val-page-load', perf.pageLoad, 'ms');
+                animateNumber('val-dom-content', perf.domContent, 'ms');
             } else {
                 document.getElementById('val-page-load').innerText = '0ms';
                 document.getElementById('val-dom-content').innerText = '0ms';
