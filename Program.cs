@@ -568,7 +568,9 @@ app.MapGet("/api/analytics/kql-kpis", async (IConfiguration config) => {
     try {
         var client = new LogsQueryClient(new DefaultAzureCredential());
         var query = "AppEvents | where Name == 'TimeOnPage' | extend ActiveSeconds = toint(Properties.activeTimeSeconds) | summarize avg(ActiveSeconds)";
-        var val = result.Value.FirstOrDefault();
+        var result = await client.QueryWorkspaceAsync(workspaceId, query, new QueryTimeRange(TimeSpan.FromDays(30)));
+        var val = result.Value.AllTables.FirstOrDefault()?.Rows.FirstOrDefault()?.GetDouble(0) ?? 0.0;
+        
         if (double.IsNaN(val) || double.IsInfinity(val)) val = 0;
         return Results.Ok(new { avgActiveTime = Math.Round(val, 1), mobilePercentage = 68.2 });
     } catch (Exception ex) {
