@@ -645,7 +645,7 @@
                   <tr>
                     <td bgcolor="#150e56" style="border-radius: 8px">
                       <a
-                        href="https://updates.orchvate.com"
+                        href="{{backend_url}}/api/track/click?tid={{tracking_id}}&url=https://updates.orchvate.com"
                         style="
                           display: inline-block;
                           font-family: Arial, Helvetica, sans-serif;
@@ -750,5 +750,8 @@
         </td>
       </tr>
     </table>
+    
+    <!-- Tracking Pixel -->
+    <img src="{{backend_url}}/api/track/open?tid={{tracking_id}}" width="1" height="1" style="display:none;" />
   </body>
 </html>

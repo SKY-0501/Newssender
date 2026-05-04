@@ -206,9 +206,15 @@ app.MapPost("/api/send", async (HttpContext context, [FromBody] SendSingleReques
     // Inject content into wrapper
     string finalHtml = wrapperHtml.Replace("{{message_body}}", customMessage).Replace("{{content}}", templateHtml);
 
+    var backendUrl = $"{context.Request.Scheme}://{context.Request.Host}";
+    var trackingId = Guid.NewGuid().ToString("N");
+    var finalBatchId = request.BatchId ?? $"Manual_{DateTime.UtcNow:yyyyMMdd_HHmmss}";
+
     // Personalization
     finalHtml = finalHtml.Replace("{{name}}", !string.IsNullOrWhiteSpace(request.Name) ? request.Name : "Friend");
     finalHtml = finalHtml.Replace("{{email}}", request.Email);
+    finalHtml = finalHtml.Replace("{{backend_url}}", backendUrl);
+    finalHtml = finalHtml.Replace("{{tracking_id}}", trackingId);
 
     IResult result;
     string status = "Pending";
@@ -225,18 +231,23 @@ app.MapPost("/api/send", async (HttpContext context, [FromBody] SendSingleReques
     }
 
     // Extract MessageId if possible and log to DB
-    if (result is Microsoft.AspNetCore.Http.HttpResults.Ok<object> okResult) {
-        // Since we know the structure from SendViaACS/SendViaPowerAutomate:
-        try {
-            var val = okResult.Value;
-            msgId = val?.GetType().GetProperty("MessageId")?.GetValue(val) as string;
-        } catch {}
+    try {
+        var valueProp = result.GetType().GetProperty("Value");
+        if (valueProp != null) {
+            var val = valueProp.GetValue(result);
+            if (val != null) {
+                msgId = val.GetType().GetProperty("MessageId")?.GetValue(val) as string;
+            }
+        }
+    } catch { }
+
+    if (!string.IsNullOrEmpty(msgId) || result.GetType().Name.Contains("Ok")) {
         status = "Sent";
     } else {
         status = "Failed";
     }
 
-    await LogSendStatus(config, request.Email, request.Name ?? "Friend", request.Subject ?? "Newsletter", msgId ?? "N/A", status, null, request.SenderType ?? "ACS", request.BatchId);
+    await LogSendStatus(config, request.Email, request.Name ?? "Friend", request.Subject ?? "Newsletter", msgId ?? "N/A", status, "Pending", null, request.SenderType ?? "ACS", finalBatchId, trackingId);
 
     return result;
 });
@@ -251,8 +262,8 @@ app.MapGet("/api/analytics/blasts", async (IConfiguration config) => {
                 COALESCE(batch_id, 'LEGACY') as batch_id, 
                 MIN(sent_at) as blast_time, 
                 COUNT(*) as total,
-                COUNT(*) FILTER (WHERE status = 'Sent' OR status = 'Succeeded') as success_count,
-                COUNT(*) FILTER (WHERE status = 'Failed') as fail_count,
+                COUNT(*) FILTER (WHERE delivery_status IN ('Delivered', 'Succeeded') OR (blast_status = 'Sent' AND delivery_status = 'Pending')) as success_count,
+                COUNT(*) FILTER (WHERE blast_status = 'Failed' OR delivery_status IN ('Failed', 'Dropped', 'Bounced')) as fail_count,
                 MAX(subject) as last_subject
             FROM sent_logs 
             GROUP BY batch_id 
@@ -279,7 +290,7 @@ app.MapGet("/api/analytics/blast-details/{batchId}", async (string batchId, ICon
         var connStr = config["Database:PostgresConnectionString"];
         await using var conn = new NpgsqlConnection(connStr);
         await conn.OpenAsync();
-        await using var cmd = new NpgsqlCommand("SELECT recipient_email, status, sent_at, error_message FROM sent_logs WHERE batch_id = @bid ORDER BY sent_at ASC", conn);
+        await using var cmd = new NpgsqlCommand("SELECT recipient_email, delivery_status, sent_at, error_message FROM sent_logs WHERE batch_id = @bid ORDER BY sent_at ASC", conn);
         cmd.Parameters.AddWithValue("bid", batchId);
         using var reader = await cmd.ExecuteReaderAsync();
         var logs = new List<object>();
@@ -305,7 +316,7 @@ app.MapPost("/api/analytics/sync-blast/{batchId}", async (string batchId, IConfi
         await conn.OpenAsync();
         
         var ids = new List<string>();
-        await using (var cmdFetch = new NpgsqlCommand("SELECT message_id FROM sent_logs WHERE batch_id = @bid AND status NOT IN ('Succeeded', 'Failed', 'Dropped')", conn)) {
+        await using (var cmdFetch = new NpgsqlCommand("SELECT message_id FROM sent_logs WHERE batch_id = @bid AND delivery_status NOT IN ('Succeeded', 'Delivered', 'Failed', 'Dropped')", conn)) {
             cmdFetch.Parameters.AddWithValue("bid", batchId);
             using var reader = await cmdFetch.ExecuteReaderAsync();
             while (await reader.ReadAsync()) {
@@ -417,34 +428,36 @@ async Task<IResult> SendViaPowerAutomate(string email, string subject, string ht
     }
 }
 
-async Task LogSendStatus(IConfiguration config, string email, string name, string subject, string messageId, string status, string? error, string senderType, string? batchId) {
+async Task LogSendStatus(IConfiguration config, string email, string name, string subject, string messageId, string blastStatus, string deliveryStatus, string? error, string senderType, string batchId, string trackingId) {
     try {
         var connStr = config["Database:PostgresConnectionString"];
         await using var conn = new NpgsqlConnection(connStr);
         await conn.OpenAsync();
         await using var cmd = new NpgsqlCommand(@"
-            INSERT INTO sent_logs (recipient_email, recipient_name, subject, message_id, status, error_message, sender_type, batch_id)
-            VALUES (@e, @n, @s, @m, @st, @err, @sender, @bid)", conn);
+            INSERT INTO sent_logs (recipient_email, recipient_name, subject, message_id, blast_status, delivery_status, error_message, sender_type, batch_id, tracking_id)
+            VALUES (@e, @n, @s, @m, @b_st, @d_st, @err, @sender, @bid, @tid)", conn);
         cmd.Parameters.AddWithValue("e", email);
         cmd.Parameters.AddWithValue("n", (object?)name ?? DBNull.Value);
         cmd.Parameters.AddWithValue("s", (object?)subject ?? DBNull.Value);
         cmd.Parameters.AddWithValue("m", (object?)messageId ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("st", status);
+        cmd.Parameters.AddWithValue("b_st", blastStatus);
+        cmd.Parameters.AddWithValue("d_st", deliveryStatus);
         cmd.Parameters.AddWithValue("err", (object?)error ?? DBNull.Value);
         cmd.Parameters.AddWithValue("sender", senderType);
-        cmd.Parameters.AddWithValue("bid", (object?)batchId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("bid", batchId);
+        cmd.Parameters.AddWithValue("tid", trackingId);
         await cmd.ExecuteNonQueryAsync();
     } catch (Exception ex) { Console.WriteLine("DB Log Error: " + ex.Message); }
 }
 
-async Task UpdateLogStatus(IConfiguration config, string messageId, string status) {
+async Task UpdateLogStatus(IConfiguration config, string messageId, string deliveryStatus) {
     try {
         var connStr = config["Database:PostgresConnectionString"];
         await using var conn = new NpgsqlConnection(connStr);
         await conn.OpenAsync();
-        await using var cmd = new NpgsqlCommand("UPDATE sent_logs SET status = @st, updated_at = CURRENT_TIMESTAMP WHERE message_id = @m", conn);
+        await using var cmd = new NpgsqlCommand("UPDATE sent_logs SET delivery_status = @st, updated_at = CURRENT_TIMESTAMP WHERE message_id = @m", conn);
         cmd.Parameters.AddWithValue("m", messageId);
-        cmd.Parameters.AddWithValue("st", status);
+        cmd.Parameters.AddWithValue("st", deliveryStatus);
         await cmd.ExecuteNonQueryAsync();
     } catch (Exception ex) { Console.WriteLine("DB Update Error: " + ex.Message); }
 }
@@ -788,6 +801,35 @@ app.MapPost("/api/webhooks/eventgrid", async (HttpContext context, IConfiguratio
     }
 
     return Results.Ok();
+});
+
+app.MapGet("/api/track/open", async (string tid, IConfiguration config) => {
+    if (!string.IsNullOrEmpty(tid)) {
+        try {
+            var connStr = config["Database:PostgresConnectionString"];
+            await using var conn = new NpgsqlConnection(connStr);
+            await conn.OpenAsync();
+            await using var cmd = new NpgsqlCommand("UPDATE sent_logs SET opened_at = CURRENT_TIMESTAMP WHERE tracking_id = @tid AND opened_at IS NULL", conn);
+            cmd.Parameters.AddWithValue("tid", tid);
+            await cmd.ExecuteNonQueryAsync();
+        } catch { }
+    }
+    var pixel = Convert.FromBase64String("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+    return Results.File(pixel, "image/gif");
+});
+
+app.MapGet("/api/track/click", async (string tid, string url, IConfiguration config) => {
+    if (!string.IsNullOrEmpty(tid)) {
+        try {
+            var connStr = config["Database:PostgresConnectionString"];
+            await using var conn = new NpgsqlConnection(connStr);
+            await conn.OpenAsync();
+            await using var cmd = new NpgsqlCommand("UPDATE sent_logs SET clicked_at = CURRENT_TIMESTAMP WHERE tracking_id = @tid", conn);
+            cmd.Parameters.AddWithValue("tid", tid);
+            await cmd.ExecuteNonQueryAsync();
+        } catch { }
+    }
+    return Results.Redirect(string.IsNullOrEmpty(url) ? "https://orchvate.com" : url);
 });
 
 app.Run();
