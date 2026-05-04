@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
+using System.Threading.Channels;
+using Microsoft.Extensions.Caching.Memory;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,6 +40,11 @@ builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
     .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
 
 builder.Services.AddAuthorization();
+builder.Services.AddMemoryCache();
+
+// --- Queue Registration ---
+builder.Services.AddSingleton<EmailQueue>();
+builder.Services.AddHostedService<EmailBackgroundWorker>();
 
 var app = builder.Build();
 
@@ -216,43 +223,32 @@ app.MapPost("/api/send", async (HttpContext context, [FromBody] SendSingleReques
     finalHtml = finalHtml.Replace("{{backend_url}}", backendUrl);
     finalHtml = finalHtml.Replace("{{tracking_id}}", trackingId);
 
-    IResult result;
-    string status = "Pending";
-    string? msgId = null;
+    // Log as 'Queued' and add to Background Queue
+    var queue = context.RequestServices.GetRequiredService<EmailQueue>();
+    var job = new EmailJob(
+        request.Email, 
+        request.Name ?? "Friend", 
+        request.Subject ?? "Orchvate | Newsletter", 
+        finalHtml, 
+        finalBatchId, 
+        trackingId, 
+        request.SenderType ?? "ACS"
+    );
+    
+    await queue.QueueEmailAsync(job);
 
-    if (request.SenderType == "POWER_AUTOMATE") {
-        var flowUrl = config["PowerAutomate:Url"];
-        if (string.IsNullOrEmpty(flowUrl)) return Results.Problem("Power Automate URL not found.");
-        result = await SendViaPowerAutomate(request.Email, request.Subject ?? "Orchvate | Newsletter", finalHtml, flowUrl);
-    } else {
-        var connectionString = config["ACS:ConnectionString"];
-        if (string.IsNullOrEmpty(connectionString)) return Results.Problem("ACS Connection String not found.");
-        result = await SendViaACS(request.Email, request.Subject ?? "Orchvate | Newsletter", finalHtml, connectionString);
-    }
+    await LogSendStatus(config, request.Email, request.Name ?? "Friend", request.Subject ?? "Newsletter", "N/A", "Queued", "Pending", null, request.SenderType ?? "ACS", finalBatchId, trackingId);
 
-    // Extract MessageId if possible and log to DB
-    try {
-        var valueProp = result.GetType().GetProperty("Value");
-        if (valueProp != null) {
-            var val = valueProp.GetValue(result);
-            if (val != null) {
-                msgId = val.GetType().GetProperty("MessageId")?.GetValue(val) as string;
-            }
-        }
-    } catch { }
-
-    if (!string.IsNullOrEmpty(msgId) || result.GetType().Name.Contains("Ok")) {
-        status = "Sent";
-    } else {
-        status = "Failed";
-    }
-
-    await LogSendStatus(config, request.Email, request.Name ?? "Friend", request.Subject ?? "Newsletter", msgId ?? "N/A", status, "Pending", null, request.SenderType ?? "ACS", finalBatchId, trackingId);
-
-    return result;
+    return Results.Accepted(null, new { Success = true, Message = "Email queued for delivery", TrackingId = trackingId });
 });
 
-app.MapGet("/api/analytics/blasts", async (IConfiguration config) => {
+app.MapGet("/api/analytics/blasts", async (IConfiguration config, Microsoft.Extensions.Caching.Memory.IMemoryCache cache) => {
+    const string cacheKey = "analytics_blasts";
+    if (cache.TryGetValue(cacheKey, out var cachedBlasts))
+    {
+        return Results.Ok(cachedBlasts);
+    }
+
     try {
         var connStr = config["Database:PostgresConnectionString"];
         await using var conn = new NpgsqlConnection(connStr);
@@ -281,6 +277,10 @@ app.MapGet("/api/analytics/blasts", async (IConfiguration config) => {
                 Subject = reader.IsDBNull(5) ? "No Subject" : reader.GetString(5)
             });
         }
+
+        // Cache the result for 5 minutes
+        cache.Set(cacheKey, blasts, TimeSpan.FromMinutes(5));
+        
         return Results.Ok(blasts);
     } catch (Exception ex) { return Results.Problem(ex.Message); }
 });
@@ -290,16 +290,19 @@ app.MapGet("/api/analytics/blast-details/{batchId}", async (string batchId, ICon
         var connStr = config["Database:PostgresConnectionString"];
         await using var conn = new NpgsqlConnection(connStr);
         await conn.OpenAsync();
-        await using var cmd = new NpgsqlCommand("SELECT recipient_email, delivery_status, sent_at, error_message FROM sent_logs WHERE batch_id = @bid ORDER BY sent_at ASC", conn);
+        await using var cmd = new NpgsqlCommand("SELECT recipient_email, blast_status, delivery_status, opened_at, clicked_at, sent_at, error_message FROM sent_logs WHERE batch_id = @bid ORDER BY sent_at ASC", conn);
         cmd.Parameters.AddWithValue("bid", batchId);
         using var reader = await cmd.ExecuteReaderAsync();
         var logs = new List<object>();
         while (await reader.ReadAsync()) {
             logs.Add(new {
                 Email = reader.GetString(0),
-                Status = reader.GetString(1),
-                Time = reader.GetDateTime(2),
-                Error = reader.IsDBNull(3) ? "" : reader.GetString(3)
+                BlastStatus = reader.IsDBNull(1) ? "N/A" : reader.GetString(1),
+                DeliveryStatus = reader.IsDBNull(2) ? "N/A" : reader.GetString(2),
+                OpenedAt = reader.IsDBNull(3) ? (DateTime?)null : reader.GetDateTime(3),
+                ClickedAt = reader.IsDBNull(4) ? (DateTime?)null : reader.GetDateTime(4),
+                Time = reader.GetDateTime(5),
+                Error = reader.IsDBNull(6) ? "" : reader.GetString(6)
             });
         }
         return Results.Ok(logs);
@@ -393,40 +396,7 @@ app.MapGet("/api/send-status/{id}", async (string id, IConfiguration config) => 
     }
 });
 
-// --- Sending Helpers ---
-async Task<IResult> SendViaACS(string email, string subject, string html, string connectionString) {
-    try {
-        var emailClient = new EmailClient(connectionString);
-        var message = new EmailMessage(
-            senderAddress: "founders@milestones.orchvate.com",
-            content: new EmailContent(subject) { Html = html },
-            recipients: new EmailRecipients(new List<EmailAddress> { new EmailAddress(email) })
-        );
-        message.ReplyTo.Add(new EmailAddress("founders@milestones.orchvate.com"));
-        
-        // Use WaitUntil.Started to get the OperationId immediately for live tracking
-        var operation = await emailClient.SendAsync(WaitUntil.Started, message);
-        return Results.Ok(new { Success = true, Sender = "ACS", MessageId = operation.Id });
-    } catch (Exception ex) {
-        Console.WriteLine($"ACS Send failed to {email}: {ex.Message}");
-        return Results.Problem(ex.Message);
-    }
-}
-
-async Task<IResult> SendViaPowerAutomate(string email, string subject, string html, string flowUrl) {
-    try {
-        using var client = new HttpClient();
-        var payload = new { email = email, subject = subject, htmlContent = html };
-        var response = await client.PostAsJsonAsync(flowUrl, payload);
-        if (response.IsSuccessStatusCode)
-            return Results.Ok(new { Success = true, Sender = "PowerAutomate", MessageId = "PA-" + Guid.NewGuid().ToString("N").Substring(0, 8) });
-        var error = await response.Content.ReadAsStringAsync();
-        return Results.Problem($"Power Automate failed: {error}");
-    } catch (Exception ex) {
-        Console.WriteLine($"Power Automate failed to {email}: {ex.Message}");
-        return Results.Problem(ex.Message);
-    }
-}
+// --- Sending Helpers moved to EmailSender class ---
 
 async Task LogSendStatus(IConfiguration config, string email, string name, string subject, string messageId, string blastStatus, string deliveryStatus, string? error, string senderType, string batchId, string trackingId) {
     try {
@@ -463,17 +433,39 @@ async Task UpdateLogStatus(IConfiguration config, string messageId, string deliv
 }
 
 // --- Analytics API Endpoints (Database / SQL) ---
-app.MapGet("/api/analytics/kpis", async (IConfiguration config) => {
+app.MapGet("/api/analytics/kpis", async (IConfiguration config, Microsoft.Extensions.Caching.Memory.IMemoryCache cache) => {
+    const string cacheKey = "analytics_kpis";
+    if (cache.TryGetValue(cacheKey, out var cachedData)) return Results.Ok(cachedData);
+
     var connStr = config["Database:PostgresConnectionString"];
     try {
         await using var conn = new NpgsqlConnection(connStr);
         await conn.OpenAsync();
-        await using var cmd = new NpgsqlCommand("SELECT (SELECT COUNT(*) FROM subscribers WHERE is_verified = TRUE) as verified, (SELECT (SUM(CASE WHEN newsletter_opt_in = TRUE THEN 1.0 ELSE 0.0 END) / COUNT(*)) * 100 FROM inquiries) as crosspoll", conn);
+        await using var cmd = new NpgsqlCommand(@"
+            SELECT 
+                (SELECT COUNT(*) FROM subscribers WHERE is_verified = TRUE) as verified, 
+                (SELECT (SUM(CASE WHEN newsletter_opt_in = TRUE THEN 1.0 ELSE 0.0 END) / NULLIF(COUNT(*), 0)) * 100 FROM inquiries) as crosspoll,
+                (SELECT COUNT(*) FROM sent_logs WHERE blast_status = 'Sent') as total_sent,
+                (SELECT COUNT(*) FROM sent_logs WHERE opened_at IS NOT NULL) as total_opened,
+                (SELECT COUNT(*) FROM sent_logs WHERE clicked_at IS NOT NULL) as total_clicked
+        ", conn);
         await using var reader = await cmd.ExecuteReaderAsync();
         if (await reader.ReadAsync()) {
             var verified = reader.IsDBNull(0) ? 0 : reader.GetInt32(0);
             var crosspoll = reader.IsDBNull(1) ? 0.0 : reader.GetDouble(1);
-            return Results.Ok(new { totalVerified = verified, crossPollinationRate = crosspoll });
+            var totalSent = reader.IsDBNull(2) ? 0L : reader.GetInt64(2);
+            var totalOpened = reader.IsDBNull(3) ? 0L : reader.GetInt64(3);
+            var totalClicked = reader.IsDBNull(4) ? 0L : reader.GetInt64(4);
+            
+            var result = new { 
+                totalVerified = verified, 
+                crossPollinationRate = crosspoll,
+                totalSent = totalSent,
+                totalOpened = totalOpened,
+                totalClicked = totalClicked
+            };
+            cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
+            return Results.Ok(result);
         }
         return Results.Ok(new { totalVerified = 0, crossPollinationRate = 0 });
     } catch (Exception ex) {
@@ -482,7 +474,10 @@ app.MapGet("/api/analytics/kpis", async (IConfiguration config) => {
     }
 });
 
-app.MapGet("/api/analytics/growth", async (IConfiguration config) => {
+app.MapGet("/api/analytics/growth", async (IConfiguration config, Microsoft.Extensions.Caching.Memory.IMemoryCache cache) => {
+    const string cacheKey = "analytics_growth";
+    if (cache.TryGetValue(cacheKey, out var cachedData)) return Results.Ok(cachedData);
+
     var connStr = config["Database:PostgresConnectionString"];
     try {
         await using var conn = new NpgsqlConnection(connStr);
@@ -497,14 +492,19 @@ app.MapGet("/api/analytics/growth", async (IConfiguration config) => {
                 values.Add((int)reader.GetInt64(1));
             }
         }
-        return Results.Ok(new { labels, values });
+        var result = new { labels, values };
+        cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
+        return Results.Ok(result);
     } catch (Exception ex) {
         Console.WriteLine($"DB Error in Growth: {ex.Message}");
         return Results.Problem($"Database connection failed: {ex.Message}");
     }
 });
 
-app.MapGet("/api/analytics/funnel", async (IConfiguration config) => {
+app.MapGet("/api/analytics/funnel", async (IConfiguration config, Microsoft.Extensions.Caching.Memory.IMemoryCache cache) => {
+    const string cacheKey = "analytics_funnel";
+    if (cache.TryGetValue(cacheKey, out var cachedData)) return Results.Ok(cachedData);
+
     var connStr = config["Database:PostgresConnectionString"];
     try {
         await using var conn = new NpgsqlConnection(connStr);
@@ -512,11 +512,13 @@ app.MapGet("/api/analytics/funnel", async (IConfiguration config) => {
         await using var cmd = new NpgsqlCommand("SELECT COUNT(*), SUM(CASE WHEN is_verified = FALSE THEN 1 ELSE 0 END), SUM(CASE WHEN is_verified = TRUE THEN 1 ELSE 0 END) FROM subscribers", conn);
         await using var reader = await cmd.ExecuteReaderAsync();
         if (await reader.ReadAsync()) {
-            return Results.Ok(new {
+            var result = new {
                 total = reader.IsDBNull(0) ? 0 : reader.GetInt64(0),
                 pending = reader.IsDBNull(1) ? 0 : reader.GetInt64(1),
                 verified = reader.IsDBNull(2) ? 0 : reader.GetInt64(2)
-            });
+            };
+            cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
+            return Results.Ok(result);
         }
         return Results.Ok(new { total = 0, pending = 0, verified = 0 });
     } catch (Exception ex) {
@@ -525,7 +527,10 @@ app.MapGet("/api/analytics/funnel", async (IConfiguration config) => {
     }
 });
 
-app.MapGet("/api/analytics/topics", async (IConfiguration config) => {
+app.MapGet("/api/analytics/topics", async (IConfiguration config, Microsoft.Extensions.Caching.Memory.IMemoryCache cache) => {
+    const string cacheKey = "analytics_topics";
+    if (cache.TryGetValue(cacheKey, out var cachedData)) return Results.Ok(cachedData);
+
     var connStr = config["Database:PostgresConnectionString"];
     try {
         await using var conn = new NpgsqlConnection(connStr);
@@ -538,7 +543,9 @@ app.MapGet("/api/analytics/topics", async (IConfiguration config) => {
             labels.Add(reader.GetString(0));
             values.Add((int)reader.GetInt64(1));
         }
-        return Results.Ok(new { labels, values });
+        var result = new { labels, values };
+        cache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
+        return Results.Ok(result);
     } catch (Exception ex) {
         Console.WriteLine($"DB Error in Topics: {ex.Message}");
         return Results.Problem($"Database connection failed: {ex.Message}");
@@ -836,3 +843,158 @@ app.Run();
 
 public record SendSingleRequest(string Email, string? Name, string? Subject, string? SenderType, string? Body, string? BatchId, string? SafetyPassword);
 public record Subscriber(string Name, string Email);
+
+// --- Queue and Worker Logic ---
+public record EmailJob(string Email, string Name, string Subject, string Html, string BatchId, string TrackingId, string SenderType);
+
+public class EmailQueue
+{
+    private readonly Channel<EmailJob> _queue = Channel.CreateUnbounded<EmailJob>();
+
+    public async ValueTask QueueEmailAsync(EmailJob job) => await _queue.Writer.WriteAsync(job);
+
+    public async ValueTask<EmailJob> DequeueAsync(CancellationToken ct) => await _queue.Reader.ReadAsync(ct);
+}
+
+public class EmailBackgroundWorker : BackgroundService
+{
+    private readonly EmailQueue _queue;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<EmailBackgroundWorker> _logger;
+
+    public EmailBackgroundWorker(EmailQueue queue, IServiceProvider serviceProvider, ILogger<EmailBackgroundWorker> logger)
+    {
+        _queue = queue;
+        _serviceProvider = serviceProvider;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("Email Background Worker is starting with Domain Protection (30 per batch).");
+        
+        int emailsSentInCurrentBatch = 0;
+        const int batchLimit = 30;
+        const int restPeriodMinutes = 3;
+        const int individualDelayMs = 2000; // 2 seconds between emails
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                var job = await _queue.DequeueAsync(stoppingToken);
+                _logger.LogInformation($"Processing email {emailsSentInCurrentBatch + 1}/{batchLimit} to {job.Email}");
+
+                using (var scope = _serviceProvider.CreateScope())
+                {
+                    var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+                    
+                    IResult result;
+                    if (job.SenderType == "POWER_AUTOMATE") 
+                    {
+                        var flowUrl = config["PowerAutomate:Url"];
+                        result = await EmailSender.SendViaPowerAutomate(job.Email, job.Subject, job.Html, flowUrl!);
+                    }
+                    else
+                    {
+                        var acsConn = config["ACS:ConnectionString"];
+                        result = await EmailSender.SendViaACS(job.Email, job.Subject, job.Html, acsConn!);
+                    }
+
+                    // Extract MessageId and Update DB
+                    string? msgId = null;
+                    try 
+                    {
+                        var valueProp = result.GetType().GetProperty("Value");
+                        if (valueProp != null) 
+                        {
+                            var val = valueProp.GetValue(result);
+                            if (val != null) 
+                            {
+                                msgId = val.GetType().GetProperty("MessageId")?.GetValue(val) as string;
+                            }
+                        }
+                    } catch { }
+
+                    var status = (!string.IsNullOrEmpty(msgId) || result.GetType().Name.Contains("Ok")) ? "Sent" : "Failed";
+                    await UpdateLogWithFullDetails(config, job.TrackingId, msgId ?? "N/A", status);
+                }
+
+                emailsSentInCurrentBatch++;
+
+                if (emailsSentInCurrentBatch >= batchLimit)
+                {
+                    _logger.LogInformation($"Batch limit reached ({batchLimit}). Resting for {restPeriodMinutes} minutes to safeguard domain reputation...");
+                    await Task.Delay(TimeSpan.FromMinutes(restPeriodMinutes), stoppingToken);
+                    emailsSentInCurrentBatch = 0;
+                }
+                else
+                {
+                    await Task.Delay(individualDelayMs, stoppingToken);
+                }
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred executing email job.");
+            }
+        }
+    }
+
+    private async Task UpdateLogWithFullDetails(IConfiguration config, string trackingId, string messageId, string status)
+    {
+        try
+        {
+            var connStr = config["Database:PostgresConnectionString"];
+            await using var conn = new NpgsqlConnection(connStr);
+            await conn.OpenAsync();
+            await using var cmd = new NpgsqlCommand("UPDATE sent_logs SET message_id = @m, blast_status = @st, updated_at = CURRENT_TIMESTAMP WHERE tracking_id = @tid", conn);
+            cmd.Parameters.AddWithValue("m", messageId);
+            cmd.Parameters.AddWithValue("st", status);
+            cmd.Parameters.AddWithValue("tid", trackingId);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex) { _logger.LogError(ex, "Failed to update DB in background worker"); }
+    }
+
+    // Helper methods must be static or accessible if moved here, 
+    // but in Minimal API Top-Level they are usually accessible as locals or we need to pass them.
+}
+
+public static class EmailSender
+{
+    public static async Task<IResult> SendViaACS(string email, string subject, string html, string connectionString) 
+    {
+        try {
+            var emailClient = new EmailClient(connectionString);
+            var message = new EmailMessage(
+                senderAddress: "founders@milestones.orchvate.com",
+                content: new EmailContent(subject) { Html = html },
+                recipients: new EmailRecipients(new List<EmailAddress> { new EmailAddress(email) })
+            );
+            message.ReplyTo.Add(new EmailAddress("founders@milestones.orchvate.com"));
+            
+            var operation = await emailClient.SendAsync(WaitUntil.Started, message);
+            return Results.Ok(new { Success = true, Sender = "ACS", MessageId = operation.Id });
+        } catch (Exception ex) {
+            Console.WriteLine($"ACS Send failed to {email}: {ex.Message}");
+            return Results.Problem(ex.Message);
+        }
+    }
+
+    public static async Task<IResult> SendViaPowerAutomate(string email, string subject, string html, string flowUrl) 
+    {
+        try {
+            using var client = new HttpClient();
+            var payload = new { email = email, subject = subject, htmlContent = html };
+            var response = await client.PostAsJsonAsync(flowUrl, payload);
+            if (response.IsSuccessStatusCode)
+                return Results.Ok(new { Success = true, Sender = "PowerAutomate", MessageId = "PA-" + Guid.NewGuid().ToString("N").Substring(0, 8) });
+            var error = await response.Content.ReadAsStringAsync();
+            return Results.Problem($"Power Automate failed: {error}");
+        } catch (Exception ex) {
+            Console.WriteLine($"Power Automate failed to {email}: {ex.Message}");
+            return Results.Problem(ex.Message);
+        }
+    }
+}

@@ -384,23 +384,37 @@
                         <thead>
                             <tr>
                                 <th>Recipient Email</th>
-                                <th>Result</th>
-                                <th>Timestamp</th>
+                                <th>App Status</th>
+                                <th>Inbox Status</th>
+                                <th>Opened</th>
+                                <th>Clicked</th>
+                                <th>Time</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${data.map(d => `
+                            ${data.map(d => {
+                                let openedStatus = d.openedAt ? '<span class="status-badge status-success" style="background:#eeeeea; color:#1a1a1a;">Opened</span>' : '<span style="color:#999;">—</span>';
+                                let clickedStatus = d.clickedAt ? '<span class="status-badge status-success">Clicked</span>' : '<span style="color:#999;">—</span>';
+
+                                return `
                                 <tr>
                                     <td><strong>${d.email}</strong></td>
                                     <td>
-                                        <span class="status-badge ${d.status === 'Succeeded' || d.status === 'Sent' ? 'status-success' : 'status-failed'}">
-                                            ${d.status}
+                                        <span class="status-badge ${d.blastStatus === 'Sent' ? 'status-success' : d.blastStatus === 'Queued' ? 'status-pending' : 'status-failed'}">
+                                            ${d.blastStatus}
                                         </span>
-                                        ${d.error ? `<div style="font-size:10px; color:var(--danger);">${d.error}</div>` : ''}
                                     </td>
+                                    <td>
+                                        <span class="status-badge ${d.deliveryStatus === 'Delivered' || d.deliveryStatus === 'Succeeded' ? 'status-success' : d.deliveryStatus === 'Pending' ? 'status-pending' : 'status-failed'}">
+                                            ${d.deliveryStatus}
+                                        </span>
+                                        ${d.error ? `<div style="font-size:10px; color:#FF2D2D;">${d.error}</div>` : ''}
+                                    </td>
+                                    <td>${openedStatus}</td>
+                                    <td>${clickedStatus}</td>
                                     <td style="color:#666;">${new Date(d.time).toLocaleTimeString()}</td>
-                                </tr>
-                            `).join('')}
+                                </tr>`;
+                            }).join('')}
                         </tbody>
                     </table>
                 `;

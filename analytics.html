@@ -289,6 +289,34 @@
             .header p { font-size: 14px; color: #666; margin-top: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
         </style>
 
+    <!-- Tier 0: Newsletter Engagement (New) -->
+    <div class="dashboard-grid">
+        <div class="widget tier-1" id="w-total-sent">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Newsletter Deliveries</div>
+            <div class="kpi-value" id="val-total-sent">-</div>
+            <div class="kpi-sub">Total Lifetime Sent</div>
+        </div>
+        <div class="widget tier-1" id="w-total-opened">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Total Opens</div>
+            <div class="kpi-value" id="val-total-opened">-</div>
+            <div class="kpi-sub">Emails Seen (Pixel)</div>
+        </div>
+        <div class="widget tier-1" id="w-total-clicked">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">Total Clicks</div>
+            <div class="kpi-value" id="val-total-clicked">-</div>
+            <div class="kpi-sub">Newsletter CTA Interaction</div>
+        </div>
+        <div class="widget tier-1" id="w-click-rate">
+            <div class="loading-overlay"><div class="spinner"></div></div>
+            <div class="widget-title">CTOR</div>
+            <div class="kpi-value" id="val-click-rate">-%</div>
+            <div class="kpi-sub">Click-to-Open Rate</div>
+        </div>
+    </div>
+
     <!-- Tier 1: High-Level KPIs -->
     <div class="dashboard-grid">
         <div class="widget tier-1" id="w1-subscribers">
@@ -542,9 +570,22 @@
                 if (kpis && kpis.totalVerified !== undefined) {
                     animateNumber('val-subscribers', kpis.totalVerified);
                     animateNumber('val-crosspoll', kpis.crossPollinationRate || 0, '%', 1);
+                    
+                    // New Newsletter Stats
+                    animateNumber('val-total-sent', kpis.totalSent || 0);
+                    animateNumber('val-total-opened', kpis.totalOpened || 0);
+                    animateNumber('val-total-clicked', kpis.totalClicked || 0);
+                    
+                    const ctor = kpis.totalOpened > 0 ? (kpis.totalClicked / kpis.totalOpened) * 100 : 0;
+                    animateNumber('val-click-rate', ctor, '%', 1);
                 }
                 const crossOverlay = document.querySelector('#w2-crosspoll .loading-overlay');
                 if (crossOverlay) crossOverlay.style.display = 'none';
+                
+                ['w-total-sent', 'w-total-opened', 'w-total-clicked', 'w-click-rate'].forEach(id => {
+                    const overlay = document.querySelector(`#${id} .loading-overlay`);
+                    if (overlay) overlay.style.display = 'none';
+                });
             });
             
             // KQL Based KPIs
