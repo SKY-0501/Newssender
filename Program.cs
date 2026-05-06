@@ -44,6 +44,19 @@ builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.AddMemoryCache();
 
+// --- Cookie & Proxy Fixes for Azure ---
+builder.Services.Configure<CookiePolicyOptions>(options =>
+{
+    options.MinimumSameSitePolicy = SameSiteMode.None;
+    options.Secure = CookieSecurePolicy.Always;
+});
+
+builder.Services.Configure<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>(Microsoft.Identity.Web.Constants.CookieScheme, options =>
+{
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.None;
+});
+
 // --- Azure Service Bus Registration ---
 var sbConn = builder.Configuration["ServiceBus:ConnectionString"];
 if (!string.IsNullOrEmpty(sbConn))
@@ -83,6 +96,7 @@ app.UseStaticFiles(new StaticFileOptions { FileProvider = new Microsoft.Extensio
 app.UseRouting();
 app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 
+app.UseCookiePolicy();
 app.UseAuthentication();
 app.UseAuthorization();
 

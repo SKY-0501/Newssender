@@ -541,6 +541,12 @@
     </style>
   </head>
   <body>
+    <script>
+      // Quick Auth Check
+      fetch('/api/auth/user').then(res => {
+        if (!res.ok) window.location.href = '/login.html';
+      }).catch(() => window.location.href = '/login.html');
+    </script>
     <div id="sidebar-placeholder"></div>
 
     <main class="main-content">
