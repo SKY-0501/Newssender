@@ -72,7 +72,17 @@ var app = builder.Build();
 // Configure Forwarded Headers for Azure Container Apps / Proxy HTTPS detection
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
-    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
+// CRITICAL FIX: Trust the Azure Proxy
+app.Use((context, next) =>
+{
+    if (context.Request.Headers.ContainsKey("X-Forwarded-Proto"))
+    {
+        context.Request.Scheme = context.Request.Headers["X-Forwarded-Proto"];
+    }
+    return next();
 });
 
 // Extra fix for Microsoft Entra ID: Ensure the app correctly identifies as HTTPS
