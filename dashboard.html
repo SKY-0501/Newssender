@@ -1464,19 +1464,19 @@
                   subject,
                   senderType,
                   body: bodyContent,
-                  batchId: batchId, // Grouping emails together
+                  batchId: batchId,
                   safetyPassword: safetyPwd
                 }),
               });
 
-              const data = await response.json();
-
               if (response.ok) {
+                const data = await response.json();
                 sentCount++;
                 addLog(`✓ Sent to ${person.email}`, "success");
               } else {
                 failedCount++;
-                addLog(`✗ Failed for ${person.email}`, "error");
+                const errorText = await response.text();
+                addLog(`✗ Error (${response.status}): ${errorText || "Unauthorized/Forbidden"}`, "error");
               }
             } catch (err) {
               failedCount++;
