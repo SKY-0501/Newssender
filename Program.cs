@@ -13,6 +13,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using System.Threading.Channels;
 using Microsoft.Extensions.Caching.Memory;
+using Azure.Messaging.ServiceBus;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,16 +44,22 @@ builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.AddMemoryCache();
 
-// --- Queue Registration ---
-builder.Services.AddSingleton<EmailQueue>();
+// --- Azure Service Bus Registration ---
+var sbConn = builder.Configuration["ServiceBus:ConnectionString"];
+if (!string.IsNullOrEmpty(sbConn))
+{
+    builder.Services.AddSingleton(new ServiceBusClient(sbConn));
+    builder.Services.AddSingleton(sp => sp.GetRequiredService<ServiceBusClient>().CreateSender("email-queue"));
+}
+
 builder.Services.AddHostedService<EmailBackgroundWorker>();
 
 var app = builder.Build();
 
-// Fix for Render/Proxy HTTPS detection
+// Configure Forwarded Headers for Azure Container Apps / Proxy HTTPS detection
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
 });
 
 if (!app.Environment.IsDevelopment())
@@ -223,8 +231,8 @@ app.MapPost("/api/send", async (HttpContext context, [FromBody] SendSingleReques
     finalHtml = finalHtml.Replace("{{backend_url}}", backendUrl);
     finalHtml = finalHtml.Replace("{{tracking_id}}", trackingId);
 
-    // Log as 'Queued' and add to Background Queue
-    var queue = context.RequestServices.GetRequiredService<EmailQueue>();
+    // Log as 'Queued' and add to Background Queue (Service Bus)
+    var sender = context.RequestServices.GetService<ServiceBusSender>();
     var job = new EmailJob(
         request.Email, 
         request.Name ?? "Friend", 
@@ -235,7 +243,16 @@ app.MapPost("/api/send", async (HttpContext context, [FromBody] SendSingleReques
         request.SenderType ?? "ACS"
     );
     
-    await queue.QueueEmailAsync(job);
+    if (sender != null)
+    {
+        var message = new ServiceBusMessage(JsonSerializer.Serialize(job));
+        await sender.SendMessageAsync(message);
+    }
+    else
+    {
+        // Fallback or error if SB not configured
+        return Results.Problem("Service Bus not configured. Email cannot be queued.");
+    }
 
     await LogSendStatus(config, request.Email, request.Name ?? "Friend", request.Subject ?? "Newsletter", "N/A", "Queued", "Pending", null, request.SenderType ?? "ACS", finalBatchId, trackingId);
 
@@ -847,98 +864,119 @@ public record Subscriber(string Name, string Email);
 // --- Queue and Worker Logic ---
 public record EmailJob(string Email, string Name, string Subject, string Html, string BatchId, string TrackingId, string SenderType);
 
-public class EmailQueue
-{
-    private readonly Channel<EmailJob> _queue = Channel.CreateUnbounded<EmailJob>();
-
-    public async ValueTask QueueEmailAsync(EmailJob job) => await _queue.Writer.WriteAsync(job);
-
-    public async ValueTask<EmailJob> DequeueAsync(CancellationToken ct) => await _queue.Reader.ReadAsync(ct);
-}
-
 public class EmailBackgroundWorker : BackgroundService
 {
-    private readonly EmailQueue _queue;
+    private readonly ServiceBusClient? _sbClient;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<EmailBackgroundWorker> _logger;
+    private ServiceBusProcessor? _processor;
 
-    public EmailBackgroundWorker(EmailQueue queue, IServiceProvider serviceProvider, ILogger<EmailBackgroundWorker> logger)
+    public EmailBackgroundWorker(IServiceProvider serviceProvider, ILogger<EmailBackgroundWorker> logger)
     {
-        _queue = queue;
         _serviceProvider = serviceProvider;
         _logger = logger;
+        _sbClient = serviceProvider.GetService<ServiceBusClient>();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Email Background Worker is starting with Domain Protection (30 per batch).");
-        
-        int emailsSentInCurrentBatch = 0;
-        const int batchLimit = 30;
-        const int restPeriodMinutes = 3;
-        const int individualDelayMs = 2000; // 2 seconds between emails
-
-        while (!stoppingToken.IsCancellationRequested)
+        if (_sbClient == null)
         {
-            try
+            _logger.LogError("Service Bus Client not found. Background worker will not start.");
+            return;
+        }
+
+        _logger.LogInformation("Email Background Worker (Service Bus) is starting.");
+
+        _processor = _sbClient.CreateProcessor("email-queue", new ServiceBusProcessorOptions
+        {
+            MaxConcurrentCalls = 1, // Domain Protection: Ensure sequential processing to respect batching/delays
+            AutoCompleteMessages = false
+        });
+
+        _processor.ProcessMessageAsync += ProcessMessageAsync;
+        _processor.ProcessErrorAsync += ProcessErrorAsync;
+
+        await _processor.StartProcessingAsync(stoppingToken);
+
+        // Keep the service alive while processing
+        await Task.Delay(-1, stoppingToken);
+    }
+
+    private async Task ProcessMessageAsync(ProcessMessageEventArgs args)
+    {
+        var body = args.Message.Body.ToString();
+        var job = JsonSerializer.Deserialize<EmailJob>(body);
+
+        if (job == null)
+        {
+            await args.CompleteMessageAsync(args.Message);
+            return;
+        }
+
+        _logger.LogInformation($"Processing email from Service Bus to {job.Email}");
+
+        using (var scope = _serviceProvider.CreateScope())
+        {
+            var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+            
+            try 
             {
-                var job = await _queue.DequeueAsync(stoppingToken);
-                _logger.LogInformation($"Processing email {emailsSentInCurrentBatch + 1}/{batchLimit} to {job.Email}");
-
-                using (var scope = _serviceProvider.CreateScope())
+                IResult result;
+                if (job.SenderType == "POWER_AUTOMATE") 
                 {
-                    var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-                    
-                    IResult result;
-                    if (job.SenderType == "POWER_AUTOMATE") 
-                    {
-                        var flowUrl = config["PowerAutomate:Url"];
-                        result = await EmailSender.SendViaPowerAutomate(job.Email, job.Subject, job.Html, flowUrl!);
-                    }
-                    else
-                    {
-                        var acsConn = config["ACS:ConnectionString"];
-                        result = await EmailSender.SendViaACS(job.Email, job.Subject, job.Html, acsConn!);
-                    }
-
-                    // Extract MessageId and Update DB
-                    string? msgId = null;
-                    try 
-                    {
-                        var valueProp = result.GetType().GetProperty("Value");
-                        if (valueProp != null) 
-                        {
-                            var val = valueProp.GetValue(result);
-                            if (val != null) 
-                            {
-                                msgId = val.GetType().GetProperty("MessageId")?.GetValue(val) as string;
-                            }
-                        }
-                    } catch { }
-
-                    var status = (!string.IsNullOrEmpty(msgId) || result.GetType().Name.Contains("Ok")) ? "Sent" : "Failed";
-                    await UpdateLogWithFullDetails(config, job.TrackingId, msgId ?? "N/A", status);
-                }
-
-                emailsSentInCurrentBatch++;
-
-                if (emailsSentInCurrentBatch >= batchLimit)
-                {
-                    _logger.LogInformation($"Batch limit reached ({batchLimit}). Resting for {restPeriodMinutes} minutes to safeguard domain reputation...");
-                    await Task.Delay(TimeSpan.FromMinutes(restPeriodMinutes), stoppingToken);
-                    emailsSentInCurrentBatch = 0;
+                    var flowUrl = config["PowerAutomate:Url"];
+                    result = await EmailSender.SendViaPowerAutomate(job.Email, job.Subject, job.Html, flowUrl!);
                 }
                 else
                 {
-                    await Task.Delay(individualDelayMs, stoppingToken);
+                    var acsConn = config["ACS:ConnectionString"];
+                    result = await EmailSender.SendViaACS(job.Email, job.Subject, job.Html, acsConn!);
                 }
+
+                // Extract MessageId and Update DB
+                string? msgId = null;
+                try 
+                {
+                    var valueProp = result.GetType().GetProperty("Value");
+                    if (valueProp != null) 
+                    {
+                        var val = valueProp.GetValue(result);
+                        if (val != null) 
+                        {
+                            msgId = val.GetType().GetProperty("MessageId")?.GetValue(val) as string;
+                        }
+                    }
+                } catch { }
+
+                var status = (!string.IsNullOrEmpty(msgId) || result.GetType().Name.Contains("Ok")) ? "Sent" : "Failed";
+                await UpdateLogWithFullDetails(config, job.TrackingId, msgId ?? "N/A", status);
+
+                await args.CompleteMessageAsync(args.Message);
+                
+                // --- Domain Protection Throttling ---
+                // Since Service Bus doesn't natively do "30 per 3 mins", we implement a simple delay here.
+                // In a true high-volume scenario, you'd use scheduled messages or a more complex orchestrator.
+                await Task.Delay(2000); // 2 seconds between emails
             }
-            catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred executing email job.");
+                _logger.LogError(ex, $"Error processing email to {job.Email}. Message will be retried by Service Bus.");
+                // Message will automatically be released for retry if not completed
             }
         }
+    }
+
+    private Task ProcessErrorAsync(ProcessErrorEventArgs args)
+    {
+        _logger.LogError(args.Exception, $"Service Bus Processor Error: {args.ErrorSource}");
+        return Task.CompletedTask;
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        if (_processor != null) await _processor.StopProcessingAsync(cancellationToken);
+        await base.StopAsync(cancellationToken);
     }
 
     private async Task UpdateLogWithFullDetails(IConfiguration config, string trackingId, string messageId, string status)
