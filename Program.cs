@@ -1041,7 +1041,7 @@ public static class EmailSender
                 content: new EmailContent(subject) { Html = html },
                 recipients: new EmailRecipients(new List<EmailAddress> { new EmailAddress(email) })
             );
-            message.ReplyTo.Add(new EmailAddress("founders@milestones.orchvate.com"));
+            message.ReplyTo.Add(new EmailAddress("aakash.padyachi@orchvate.com"));
             
             var operation = await emailClient.SendAsync(WaitUntil.Started, message);
             return Results.Ok(new { Success = true, Sender = "ACS", MessageId = operation.Id });
