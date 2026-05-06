@@ -1362,6 +1362,8 @@
               : emailBodyInput.value;
 
           let recipients = [];
+          let senderType = document.getElementById("acsSenderBtn").classList.contains("active") ? "ACS" : "POWER_AUTOMATE";
+
           if (mode === "manual") {
             const text = emailsInput.value.trim();
             if (!text) return alert("Please enter emails.");
@@ -1478,7 +1480,7 @@
               }
             } catch (err) {
               failedCount++;
-              addLog(`✗ Net Error: ${person.email}`, "error");
+              addLog(`✗ Net Error: ${err.message || person.email}`, "error");
             }
 
             const progress = Math.round(((i + 1) / recipients.length) * 100);
