@@ -571,6 +571,16 @@
             />
           </div>
 
+          <div class="input-group">
+            <label for="fromEmail">Sender Email (From)</label>
+            <input
+              type="text"
+              id="fromEmail"
+              value="founders@milestones.orchvate.com"
+              placeholder="Enter sender email..."
+            />
+          </div>
+
           <div class="widget">
             <label style="margin-bottom: 16px">Email Body</label>
             <div class="editor-wrapper">
@@ -989,6 +999,7 @@
         const spinner = document.getElementById("spinner");
         const emailsInput = document.getElementById("emails");
         const subjectInput = document.getElementById("subject");
+        const fromEmailInput = document.getElementById("fromEmail");
         const statusArea = document.getElementById("statusArea");
         const log = document.getElementById("log");
         const progressBar = document.getElementById("progressBar");
@@ -1360,6 +1371,7 @@
 
         sendBtn.addEventListener("click", async () => {
           const subject = subjectInput.value.trim();
+          const fromEmail = fromEmailInput.value.trim();
 
           // Get content based on active mode
           const bodyContent =
@@ -1468,6 +1480,7 @@
                   email: person.email,
                   name: person.name,
                   subject,
+                  fromEmail,
                   senderType,
                   body: bodyContent,
                   batchId: batchId,

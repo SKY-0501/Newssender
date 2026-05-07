@@ -271,7 +271,8 @@ app.MapPost("/api/send", async (HttpContext context, [FromBody] SendSingleReques
         finalHtml, 
         finalBatchId, 
         trackingId, 
-        request.SenderType ?? "ACS"
+        request.SenderType ?? "ACS",
+        request.FromEmail ?? "founders@milestones.orchvate.com"
     );
     
     if (sender != null)
@@ -889,11 +890,11 @@ app.MapGet("/api/track/click", async (string tid, string url, IConfiguration con
 
 app.Run();
 
-public record SendSingleRequest(string Email, string? Name, string? Subject, string? SenderType, string? Body, string? BatchId, string? SafetyPassword);
+public record SendSingleRequest(string Email, string? Name, string? Subject, string? SenderType, string? Body, string? BatchId, string? SafetyPassword, string? FromEmail);
 public record Subscriber(string Name, string Email);
 
 // --- Queue and Worker Logic ---
-public record EmailJob(string Email, string Name, string Subject, string Html, string BatchId, string TrackingId, string SenderType);
+public record EmailJob(string Email, string Name, string Subject, string Html, string BatchId, string TrackingId, string SenderType, string FromEmail);
 
 public class EmailBackgroundWorker : BackgroundService
 {
@@ -962,7 +963,7 @@ public class EmailBackgroundWorker : BackgroundService
                 else
                 {
                     var acsConn = config["ACS:ConnectionString"];
-                    result = await EmailSender.SendViaACS(job.Email, job.Subject, job.Html, acsConn!);
+                    result = await EmailSender.SendViaACS(job.Email, job.Subject, job.Html, acsConn!, job.FromEmail);
                 }
 
                 // Extract MessageId and Update DB
@@ -1032,16 +1033,16 @@ public class EmailBackgroundWorker : BackgroundService
 
 public static class EmailSender
 {
-    public static async Task<IResult> SendViaACS(string email, string subject, string html, string connectionString) 
+    public static async Task<IResult> SendViaACS(string email, string subject, string html, string connectionString, string fromEmail) 
     {
         try {
             var emailClient = new EmailClient(connectionString);
             var message = new EmailMessage(
-                senderAddress: "founders@milestones.orchvate.com",
+                senderAddress: fromEmail,
                 content: new EmailContent(subject) { Html = html },
                 recipients: new EmailRecipients(new List<EmailAddress> { new EmailAddress(email) })
             );
-            message.ReplyTo.Add(new EmailAddress("aakash.padyachi@orchvate.com"));
+            message.ReplyTo.Add(new EmailAddress(fromEmail));
             
             var operation = await emailClient.SendAsync(WaitUntil.Started, message);
             return Results.Ok(new { Success = true, Sender = "ACS", MessageId = operation.Id });
