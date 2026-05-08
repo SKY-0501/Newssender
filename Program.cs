@@ -2,6 +2,7 @@ using Azure;
 using Azure.Communication.Email;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
+using System.Data;
 using System.Net.Http.Json;
 using Npgsql;
 using Azure.Monitor.Query;
@@ -302,72 +303,7 @@ app.MapPost("/api/send", async (HttpContext context, [FromBody] SendSingleReques
     return Results.Accepted(null, new { Success = true, Message = "Email queued for delivery", TrackingId = trackingId });
 });
 
-app.MapGet("/api/analytics/blasts", async (IConfiguration config, Microsoft.Extensions.Caching.Memory.IMemoryCache cache) => {
-    const string cacheKey = "analytics_blasts";
-    if (cache.TryGetValue(cacheKey, out var cachedBlasts))
-    {
-        return Results.Ok(cachedBlasts);
-    }
 
-    try {
-        var connStr = config["Database:PostgresConnectionString"];
-        await using var conn = new NpgsqlConnection(connStr);
-        await conn.OpenAsync();
-        await using var cmd = new NpgsqlCommand(@"
-            SELECT 
-                COALESCE(batch_id, 'LEGACY') as batch_id, 
-                MIN(sent_at) as blast_time, 
-                COUNT(*) as total,
-                COUNT(*) FILTER (WHERE delivery_status IN ('Delivered', 'Succeeded') OR (blast_status = 'Sent' AND delivery_status = 'Pending')) as success_count,
-                COUNT(*) FILTER (WHERE blast_status = 'Failed' OR delivery_status IN ('Failed', 'Dropped', 'Bounced')) as fail_count,
-                MAX(subject) as last_subject
-            FROM sent_logs 
-            GROUP BY batch_id 
-            ORDER BY blast_time DESC", conn);
-        
-        using var reader = await cmd.ExecuteReaderAsync();
-        var blasts = new List<object>();
-        while (await reader.ReadAsync()) {
-            blasts.Add(new {
-                BatchId = reader.GetString(0),
-                Time = reader.GetDateTime(1),
-                Total = reader.GetInt64(2),
-                Sent = reader.GetInt64(3),
-                Failed = reader.GetInt64(4),
-                Subject = reader.IsDBNull(5) ? "No Subject" : reader.GetString(5)
-            });
-        }
-
-        // Cache the result for 5 minutes
-        cache.Set(cacheKey, blasts, TimeSpan.FromMinutes(5));
-        
-        return Results.Ok(blasts);
-    } catch (Exception ex) { return Results.Problem(ex.Message); }
-});
-
-app.MapGet("/api/analytics/blast-details/{batchId}", async (string batchId, IConfiguration config) => {
-    try {
-        var connStr = config["Database:PostgresConnectionString"];
-        await using var conn = new NpgsqlConnection(connStr);
-        await conn.OpenAsync();
-        await using var cmd = new NpgsqlCommand("SELECT recipient_email, blast_status, delivery_status, opened_at, clicked_at, sent_at, error_message FROM sent_logs WHERE batch_id = @bid ORDER BY sent_at ASC", conn);
-        cmd.Parameters.AddWithValue("bid", batchId);
-        using var reader = await cmd.ExecuteReaderAsync();
-        var logs = new List<object>();
-        while (await reader.ReadAsync()) {
-            logs.Add(new {
-                Email = reader.GetString(0),
-                BlastStatus = reader.IsDBNull(1) ? "N/A" : reader.GetString(1),
-                DeliveryStatus = reader.IsDBNull(2) ? "N/A" : reader.GetString(2),
-                OpenedAt = reader.IsDBNull(3) ? (DateTime?)null : reader.GetDateTime(3),
-                ClickedAt = reader.IsDBNull(4) ? (DateTime?)null : reader.GetDateTime(4),
-                Time = reader.GetDateTime(5),
-                Error = reader.IsDBNull(6) ? "" : reader.GetString(6)
-            });
-        }
-        return Results.Ok(logs);
-    } catch (Exception ex) { return Results.Problem(ex.Message); }
-});
 
 app.MapPost("/api/analytics/sync-blast/{batchId}", async (string batchId, IConfiguration config) => {
     try {
