@@ -220,12 +220,21 @@ app.MapPost("/api/send", async (HttpContext context, [FromBody] SendSingleReques
         return Results.Unauthorized();
     }
 
-    // 2. Check Authorization (Only Aakash and Rahul)
-    var userEmail = context.User.Claims.FirstOrDefault(c => c.Type == "preferred_username")?.Value?.ToLower();
-    var allowedEmails = new[] { "aakash.padyachi@orchvate.com", "rahul.rajesh@orchvate.com" };
+    // 2. Check Authorization
+    var userEmail = context.User.Claims.FirstOrDefault(c => c.Type == "preferred_username")?.Value?.ToLower()?.Trim();
+    
+    var allowedEmails = new[] { 
+        "aakash.padyachi@orchvate.com", 
+        "rahul.rajesh@orchvate.com",
+        "aakash.padyachi@orchvate.in",
+        "rahul.rajesh@orchvate.in",
+        "founders@orchvate.in",
+        "founders@founders.orchvate.in"
+    };
 
-    if (userEmail == null || !allowedEmails.Contains(userEmail)) {
-        return Results.Forbid();
+    if (string.IsNullOrEmpty(userEmail) || !allowedEmails.Contains(userEmail)) {
+        Console.WriteLine($"[Auth Error] User '{userEmail ?? "Unknown"}' is not in the allowed list.");
+        return Results.Json(new { error = "Forbidden", user = userEmail }, statusCode: 403);
     }
 
     // 3. Safety Password Check
