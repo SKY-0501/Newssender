@@ -843,13 +843,13 @@ app.MapGet("/api/track/click", async (string tid, string url, IConfiguration con
                 SELECT 
                     batch_id as BatchId,
                     COALESCE(MAX(subject), 'No Subject') as Subject,
-                    MAX(created_at) as Time,
+                    MAX(updated_at) as Time,
                     COUNT(*) as Total,
                     COUNT(*) FILTER (WHERE status LIKE 'Sent%' OR status = 'QUEUED') as Sent,
                     0 as Failed
                 FROM sent_logs
                 GROUP BY batch_id
-                ORDER BY MAX(created_at) DESC");
+                ORDER BY MAX(updated_at) DESC");
             return Results.Ok(blasts);
         });
 
@@ -860,7 +860,7 @@ app.MapGet("/api/track/click", async (string tid, string url, IConfiguration con
                 SELECT email as RecipientEmail, status as AppStatus, 'SUCCEEDED' as InboxStatus, updated_at as Time
                 FROM sent_logs
                 WHERE batch_id = @batchId
-                ORDER BY created_at ASC", new { batchId });
+                ORDER BY updated_at ASC", new { batchId });
             return Results.Ok(details);
         });
 
