@@ -576,7 +576,7 @@
             <input
               type="text"
               id="fromEmail"
-              value="founders@milestones.orchvate.com"
+              value="founders@milestones.orchvate.in"
               placeholder="Enter sender email..."
             />
           </div>
@@ -1211,16 +1211,16 @@
             emailCell = s.email || "";
           }
           return (
-            '<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;padding:8px;border-radius:12px;background:' +
+            '<div class="subscriber-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center;padding:8px;border-radius:12px;background:' +
             bg +
             ";border:3px solid " +
             border +
             ';">' +
-            '<div style="flex:1;font-size:13px;font-weight:900;color:#131313;">' +
-            nameCell +
+            '<div style="flex:1;">' +
+            '<input type="text" class="name-input" placeholder="Name" value="' + (s.name || "") + '" style="width:100%;border:none;outline:none;font-size:13px;font-weight:900;color:#131313;background:transparent;">' +
             "</div>" +
-            '<div style="flex:1.5;font-size:13px;color:#333;">' +
-            emailCell +
+            '<div style="flex:1.5;">' +
+            '<input type="email" class="email-input" placeholder="Email" value="' + (s.email || "") + '" style="width:100%;border:none;outline:none;font-size:13px;color:#333;background:transparent;">' +
             "</div>" +
             '<div style="font-size:11px;padding:2px 6px;border-radius:4px;font-weight:bold;background:' +
             badge +
@@ -1342,12 +1342,18 @@
 
         function updateSubscribersFromUI() {
           const rows = subscriberList.querySelectorAll(".subscriber-row");
-          loadedSubscribers = Array.from(rows)
-            .map((row) => ({
-              name: row.querySelector(".name-input").value.trim(),
-              email: row.querySelector(".email-input").value.trim(),
-            }))
-            .filter((s) => s.email !== "");
+          const subs = [];
+          rows.forEach(row => {
+            const nameInp = row.querySelector(".name-input");
+            const emailInp = row.querySelector(".email-input");
+            if (emailInp && emailInp.value.trim()) {
+              subs.push({
+                name: nameInp ? nameInp.value.trim() : "",
+                email: emailInp.value.trim()
+              });
+            }
+          });
+          loadedSubscribers = subs;
         }
 
         function renderSubscribers() {
