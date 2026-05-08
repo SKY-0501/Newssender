@@ -836,7 +836,9 @@ app.MapGet("/api/track/click", async (string tid, string url, IConfiguration con
     return Results.Redirect(string.IsNullOrEmpty(url) ? "https://orchvate.com" : url);
 });
 
-        app.MapGet("/api/analytics/blasts", async (IDbConnection db) => {
+        app.MapGet("/api/analytics/blasts", async (IConfiguration config) => {
+            var connStr = config["Database:PostgresConnectionString"];
+            await using var db = new NpgsqlConnection(connStr);
             var blasts = await db.QueryAsync<dynamic>(@"
                 SELECT 
                     batch_id as BatchId,
@@ -851,7 +853,9 @@ app.MapGet("/api/track/click", async (string tid, string url, IConfiguration con
             return Results.Ok(blasts);
         });
 
-        app.MapGet("/api/analytics/blast-details/{batchId}", async (string batchId, IDbConnection db) => {
+        app.MapGet("/api/analytics/blast-details/{batchId}", async (string batchId, IConfiguration config) => {
+            var connStr = config["Database:PostgresConnectionString"];
+            await using var db = new NpgsqlConnection(connStr);
             var details = await db.QueryAsync<dynamic>(@"
                 SELECT email as RecipientEmail, status as AppStatus, 'SUCCEEDED' as InboxStatus, updated_at as Time
                 FROM sent_logs
