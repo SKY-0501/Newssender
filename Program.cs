@@ -991,6 +991,17 @@ public class EmailBackgroundWorker : BackgroundService
                 } catch { }
 
                 var status = (!string.IsNullOrEmpty(msgId) || result.GetType().Name.Contains("Ok")) ? "Sent" : "Failed";
+                
+                // If it failed, try to get the error message
+                if (status == "Failed") {
+                    try {
+                        var problemValue = result.GetType().GetProperty("Value")?.GetValue(result);
+                        var detail = problemValue?.GetType().GetProperty("Detail")?.GetValue(problemValue) as string;
+                        if (!string.IsNullOrEmpty(detail)) status = $"Failed: {detail}";
+                    } catch { }
+                }
+
+                Console.WriteLine($"[Worker] Status for {job.Email}: {status}");
                 await UpdateLogWithFullDetails(config, job.TrackingId, msgId ?? "N/A", status);
 
                 await args.CompleteMessageAsync(args.Message);
