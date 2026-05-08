@@ -3,6 +3,7 @@ using Azure.Communication.Email;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
 using System.Data;
+using Dapper;
 using System.Net.Http.Json;
 using Npgsql;
 using Azure.Monitor.Query;
