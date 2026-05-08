@@ -572,14 +572,35 @@
           </div>
 
           <div class="input-group">
-            <label for="fromEmail">Sender Email (From)</label>
+            <label for="fromEmailSelect">Sender Profile</label>
+            <select id="fromEmailSelect" onchange="updateManualEmail(this.value)" style="width: 100%; padding: 12px; background: #1a1a1a; border: 1px solid #333; color: white; border-radius: 8px; margin-bottom: 8px;">
+              <option value="founders@orchvate.in">Founders (founders@orchvate.in)</option>
+              <option value="panchali@founders.orchvate.in">Panchali (panchali@founders.orchvate.in)</option>
+              <option value="geethanjali@founders.orchvate.in">Geethanjali (geethanjali@founders.orchvate.in)</option>
+              <option value="noreply@milestones.orchvate.in">No-Reply (noreply@milestones.orchvate.in)</option>
+              <option value="manual">-- Manual Entry --</option>
+            </select>
             <input
               type="text"
               id="fromEmail"
-              value="founders@milestones.orchvate.in"
-              placeholder="Enter sender email..."
+              value="founders@orchvate.in"
+              placeholder="Enter sender email manually..."
+              style="display: none;"
             />
           </div>
+
+          <script>
+            function updateManualEmail(val) {
+              const manualInput = document.getElementById('fromEmail');
+              if (val === 'manual') {
+                manualInput.style.display = 'block';
+                manualInput.value = '';
+              } else {
+                manualInput.style.display = 'none';
+                manualInput.value = val;
+              }
+            }
+          </script>
 
           <div class="widget">
             <label style="margin-bottom: 16px">Email Body</label>
