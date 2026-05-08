@@ -62,13 +62,32 @@
             ease: "back.out(2)" 
           }, "-=0.8")
           .from(".header p", { opacity: 0, y: 10, duration: 0.8 }, "-=0.6")
-          .from(".widget:not([style*='display: none'])", { 
-            opacity: 0,
-            duration: 0.5,
+          .to(".welcome-header", { opacity: 1, y: 0, duration: 0.8, ease: "power2.out" }, "-=0.4")
+          .to(".widget, .input-group", { 
+            opacity: 1,
+            y: 0,
+            duration: 0.8,
             stagger: 0.1,
-            ease: "power2.out",
-            clearProps: "opacity"
-          }, "-=0.4");
+            ease: "power3.out"
+          }, "-=0.6");
+          
+        // Personalized Greeting Logic
+        const greetings = [
+          "Long time no see! Were you vacationing in the spam folder?",
+          "The email legend has returned to the cockpit.",
+          "Back for more high-volume havoc, I see?",
+          "Your keyboard missed the touch of a master.",
+          "Scanning for brilliance... Ah, there you are.",
+          "Warning: Extremely high levels of sender-energy detected."
+        ];
+        
+        const welcomeTitle = document.querySelector('.welcome-title');
+        const welcomeMsg = document.querySelector('.welcome-msg');
+        if (welcomeTitle && welcomeMsg) {
+          const name = currentUserEmail ? currentUserEmail.split('.')[0].charAt(0).toUpperCase() + currentUserEmail.split('.')[0].slice(1) : "Legend";
+          welcomeTitle.innerText = `Welcome back, ${name}`;
+          welcomeMsg.innerText = greetings[Math.floor(Math.random() * greetings.length)];
+        }
       });
 
       checkAuthStatus();
@@ -140,14 +159,42 @@
       .right-col { padding-top: 40px; }
 
       /* CARDS — Dashed technical style */
-      .widget {
+      .widget, .input-group {
         background: var(--surface);
         border: 2px dashed var(--border);
         border-radius: 4px;
         padding: 32px;
         position: relative;
         margin-bottom: 24px;
-        /* Animation: translateY only — no box-shadow to avoid phantom card artifact */
+        opacity: 0; /* Initial state for GSAP */
+      }
+      
+      .input-group {
+        border-style: solid;
+        border-width: 1px;
+        padding: 20px;
+      }
+      
+      /* Personalized Greeting Styles */
+      .welcome-header {
+        margin-bottom: 32px;
+        padding-left: 4px;
+        opacity: 0;
+      }
+      .welcome-title {
+        font-size: 28px;
+        font-weight: 900;
+        letter-spacing: -1px;
+        background: linear-gradient(90deg, #fff, var(--highlight));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .welcome-msg {
+        font-size: 14px;
+        color: var(--text-sub);
+        margin-top: 4px;
+        font-style: italic;
+      }
         transition: transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
       }
       .widget:hover {
@@ -574,12 +621,14 @@
           <div class="input-group">
             <label for="fromEmailSelect">Sender Profile</label>
             <select id="fromEmailSelect" onchange="updateManualEmail(this.value)" style="width: 100%; padding: 12px; background: #1a1a1a; border: 1px solid #333; color: white; border-radius: 8px; margin-bottom: 8px;">
-              <option value="founders@orchvate.in">Founders (founders@orchvate.in)</option>
+              <option value="founders@orchvate.in" selected>Geethanjali & Panchali (founders@orchvate.in)</option>
               <option value="panchali@founders.orchvate.in">Panchali (panchali@founders.orchvate.in)</option>
               <option value="geethanjali@founders.orchvate.in">Geethanjali (geethanjali@founders.orchvate.in)</option>
-              <option value="noreply@milestones.orchvate.in">No-Reply (noreply@milestones.orchvate.in)</option>
               <option value="manual">-- Manual Entry --</option>
             </select>
+            <p style="font-size: 11px; color: #888; margin-top: -4px; margin-bottom: 12px;">
+              <strong>Active Setup:</strong> Using verified sender <em>founders@orchvate.in</em> by default.
+            </p>
             <input
               type="text"
               id="fromEmail"
@@ -669,7 +718,11 @@
         </div> <!-- End left-col -->
 
         <!-- Right Column: Settings and Sending -->
-        <div class="right-col">
+        <div class="right-col" style="padding-top: 100px;">
+          <div class="welcome-header" style="margin-bottom: 24px;">
+            <h2 class="welcome-title" style="font-size: 22px;">Welcome back</h2>
+            <p class="welcome-msg" style="font-size: 13px;">Loading hilarious message...</p>
+          </div>
           <div class="widget">
             <label>Sender Service</label>
             <div style="display: flex; gap: 10px; margin-bottom: 10px">
@@ -1518,7 +1571,7 @@
               if (response.ok) {
                 const data = await response.json();
                 sentCount++;
-                addLog(`✓ Sent to ${person.email}`, "success");
+                addLog(`✓ Queued for ${person.email}`, "success");
               } else {
                 failedCount++;
                 const errorText = await response.text();
@@ -1540,7 +1593,7 @@
           btnText.innerText = "New Blast";
           currentStatus.innerText = "Completed";
           addLog(
-            `Broadcast finished. Sent: ${sentCount}, Failed: ${failedCount}`,
+            `Broadcast finished. Queued: ${sentCount}, Failed: ${failedCount}. <a href="history.html" style="color:var(--highlight); font-weight:bold; text-decoration:underline;">View Delivery Status in History &rarr;</a>`,
             "success",
           );
         });

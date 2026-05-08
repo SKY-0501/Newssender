@@ -85,10 +85,12 @@ app.Use((context, next) =>
     return next();
 });
 
-// Extra fix for Microsoft Entra ID: Ensure the app correctly identifies as HTTPS
+// Extra fix for Microsoft Entra ID: Ensure the app correctly identifies as HTTPS in Production
 app.Use((context, next) =>
 {
-    context.Request.Scheme = "https";
+    if (!app.Environment.IsDevelopment()) {
+        context.Request.Scheme = "https";
+    }
     return next();
 });
 
@@ -998,6 +1000,11 @@ public class EmailBackgroundWorker : BackgroundService
                         var problemValue = result.GetType().GetProperty("Value")?.GetValue(result);
                         var detail = problemValue?.GetType().GetProperty("Detail")?.GetValue(problemValue) as string;
                         if (!string.IsNullOrEmpty(detail)) status = $"Failed: {detail}";
+                        else {
+                            // Try to get "error" property if it's a ProblemDetails-like object
+                            var errorProp = problemValue?.GetType().GetProperty("Error")?.GetValue(problemValue) as string;
+                            if (!string.IsNullOrEmpty(errorProp)) status = $"Failed: {errorProp}";
+                        }
                     } catch { }
                 }
 
@@ -1066,6 +1073,21 @@ public static class EmailSender
             
             var operation = await emailClient.SendAsync(WaitUntil.Started, message);
             return Results.Ok(new { Success = true, Sender = "ACS", MessageId = operation.Id });
+        } catch (Azure.RequestFailedException ex) {
+            var errorCode = ex.ErrorCode ?? "Unknown";
+            var errorMessage = ex.Message;
+            try {
+                var content = ex.GetRawResponse()?.Content?.ToString();
+                if (!string.IsNullOrEmpty(content)) {
+                    var doc = JsonDocument.Parse(content);
+                    if (doc.RootElement.TryGetProperty("error", out var errorNode) && 
+                        errorNode.TryGetProperty("message", out var msgNode)) {
+                        errorMessage = msgNode.GetString() ?? ex.Message;
+                    }
+                }
+            } catch {}
+            Console.WriteLine($"ACS Request failed to {email}: {errorCode} - {errorMessage}");
+            return Results.Problem(detail: errorMessage, title: errorCode);
         } catch (Exception ex) {
             Console.WriteLine($"ACS Send failed to {email}: {ex.Message}");
             return Results.Problem(ex.Message);
